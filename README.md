@@ -38,8 +38,8 @@ Main JSON config file:
 
 Dataset JSON config file:
 
-* name: <Name of the dataset>,
-* size: <Int, size of the dataset>,
+* name: Name of the dataset,
+* size: Int, size of the dataset,
 * trainsize: float, percentage for how big the train size should be e.g. 95% of the dataset -> 0.95,
 * x: int, x value of the to be used image,
 * y: int, y value of the to be used image,
