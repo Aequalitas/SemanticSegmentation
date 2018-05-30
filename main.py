@@ -1,5 +1,5 @@
 # Semantic Segmentation with Tensorflow
-# Franz Weidmann www.github.com/Aequalitas
+# Franz Weidmann www.github.com/Aequalitas/SemanticSegmentation
 
 import tensorflow as tf
 import os
@@ -15,13 +15,10 @@ from evaluate import evaluate
 # load config for tensorflow procedure from json
 config = json.load(open(sys.argv[2]+"Config.json"))
 # load data object initially which provides training and test data loader
-data = Data("configDataSeagrass.json")
+data = Data("configData.json")
 
-data.config["depth"] = sys.argv[3]
-data.config["size"] = sys.argv[4]
 # create the tensorflow graph and logging
 graph = buildGraph(data, config)
-
 
 os.environ["CUDA_VISIBLE_DEVICES"]=config["gpu"]
 tf.logging.set_verbosity(tf.logging.INFO)
