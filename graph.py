@@ -19,8 +19,10 @@ def buildGraph(data, config):
     labelsShape = [config["batchSize"], data.config["y"], data.config["x"]]
     labels = tf.placeholder(tf.int32, labelsShape, name="labels")
 
-    # class Weights for class imbalance
-    #classWeights = tf.ones([BSIZE, CLASSES]) * (np.load("classWeights.npy").astype(np.float32))
+    #  create weights for this particular training image
+    # onehot_labels = tf.one_hot(labels, CLASSES)
+    # weights = onehot_labels * classWeights 
+    # weights = tf.reduce_sum(weights, 3)
 
     # Neural Network
     logits, predictionNet = net(image, data.config["classes"])

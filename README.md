@@ -24,6 +24,8 @@ Usage:
 ```
 python3 main.py <MODE> <NeuralNetwork>
 ```
+Whereas MODE can be either train, predict or eval. The names of the neural networks are the filename without the .py extension.
+The model is saved into a folder named models which is two directories above relative to the main file. The same for the tensorflow log files which are located in ../../logs and the dataset folder in ../../data.
 
 Main JSON config file:
 
