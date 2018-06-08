@@ -32,7 +32,6 @@ def adaptiveConv(input, downsampleLevel, downsample=True):
 
     #residual convolution unit (RCU) 1
     firstRCU = residualConvUnit(input, downsampleLevel, "1")
-    print(firstRCU.get_shape())
     #residual convolution unit (RCU) 2
     secondRCU = residualConvUnit(firstRCU, downsampleLevel, "2")
     
@@ -68,10 +67,11 @@ def refineNet(inputs, downsampleLevel):
     mRF = multiResolutionFusion([currLevelFeatures, previousFeatures], downsampleLevel)
     
     # Chained residual pooling
-    chainedResidual_p1 = util.pool(mRF, 5, STRIDE, name="convResidual_p1_"+downsampleLevel) 
+    reluRCP = tf.nn.relu(mRF)
+    chainedResidual_p1 = util.pool(reluRCP, 5, STRIDE, name="convResidual_p1_"+downsampleLevel) 
     chainedResidual_conv1 = util.conv(chainedResidual_p1, [K,K, 256, 256], "convResidual_conv1_"+downsampleLevel)
 
-    chainedResidualSum1 = tf.add(mRF, chainedResidual_conv1)
+    chainedResidualSum1 = tf.add(reluRCP, chainedResidual_conv1)
 
     chainedResidual_pool2 = util.pool(chainedResidual_conv1, 5, STRIDE, name="chainedResidual_pool2_"+downsampleLevel) 
     chainedResidual_conv1 = util.conv(chainedResidual_pool2, [K,K, 256, 256], "chainedResidual_conv2_"+downsampleLevel)
@@ -94,15 +94,14 @@ def net(image, classes):
     output_8 = refineNet([image, output_16], "8")
     output_4 = refineNet([image, output_8], "4")
     output_2 = refineNet([image, output_4], "2")
-    output_1 = refineNet([image, output_2], "1")
 
     # upscaling to original size for usage
     
-    conv1 = adaptiveConv(output_1, "0", downsample=False)
+    conv1 = adaptiveConv(output_2, "0", downsample=False)
 
-    #outputShape = [image.get_shape()[0].value, image.get_shape()[1].value, image.get_shape()[2].value, 128]
-    #deconvFinal = util.deconv(conv1, outputShape, [K,K, 128,128], "deconvFinal", stride=4)
-    convLast = util.conv(conv1, [K,K,128,classes], "lastConv")
+    outputShape = [image.get_shape()[0].value, image.get_shape()[1].value, image.get_shape()[2].value, 128]
+    deconvFinal = util.deconv(conv1, outputShape, [K,K, 128,128], "deconvFinal", stride=2)
+    convLast = util.conv(deconvFinal, [K,K,128,classes], "lastConv")
 
     out = tf.nn.softmax(convLast)
     
