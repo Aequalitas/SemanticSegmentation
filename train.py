@@ -42,22 +42,10 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
             
             graph["logWriter"].add_summary(summary, step)
 
-            testData = data.getNextBatchTest(1)#data.getNextBatchTest(testBatch)
-            feed_dict={
-                graph["imagePlaceholder"]: np.expand_dims(testData[1], axis=3) if data.config["imageChannels"] == 1 else testData[1],
-                graph["labelPlaceholder"]: testData if data.config["imageChannels"] == 1 else testData[0]
-            }
-            
-            if acc == None:
-                acc = 100*(graph["accuracy"].eval(feed_dict=feed_dict))
-            else:
-                acc = (100*(graph["accuracy"].eval(feed_dict=feed_dict))+acc) / 2
-
             train_acc *= 100
 
-
             status = "Epoch : "+str(epoch)+" || Step: "+str(step+1)+"/"+str(int(int(data.config["size"]) * data.config["trainsize"]))
-            status += " || loss:"+str(round(loss, 3))+" || train_accuracy:"+ str(round(train_acc, 3))+" || test_accuracy: "+str(round(acc, 3))
+            status += " || loss:"+str(round(loss, 3))+" || train_accuracy:"+ str(round(train_acc, 3))
             status += "% || time 1 step with batch of "+str(config["batchSize"])+": "+str(round(end-start, 3))
 
             print(status, end="\r")            
@@ -66,3 +54,17 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
             break
 
         step+=1
+
+    # validate trained model after epoch
+    testData = data.getNextBatchTest(1)#data.getNextBatchTest(testBatch)
+    feed_dict={
+        graph["imagePlaceholder"]: np.expand_dims(testData[1], axis=3) if data.config["imageChannels"] == 1 else testData[1],
+        graph["labelPlaceholder"]: testData if data.config["imageChannels"] == 1 else testData[0]
+    }
+    
+    if acc == None:
+        acc = 100*(graph["accuracy"].eval(feed_dict=feed_dict))
+    else:
+        acc = (100*(graph["accuracy"].eval(feed_dict=feed_dict))+acc) / 2
+    
+    print("\ntest_accuracy: "+str(round(acc, 3)))
