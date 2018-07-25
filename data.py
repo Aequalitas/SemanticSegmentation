@@ -35,19 +35,29 @@ class Data:
             self.pathImages["label"] += self.config["labels"]
             
         if not self.config["serializedObject"]:
+                trainElements = int(self.config["trainSize"]*self.config["size"])
+                testElements = int(self.config["testSize"]*self.config["size"])
+                
                 self.imageData = {
-                    "train": list(filter(lambda i:i != None, trainData)),
-                    "label": list(filter(lambda i:i != None, labelData))
+                    "train": os.listdir(self.pathImages["train"])[:trainElements],
+                    "trainLabel": os.listdir(self.pathImages["trainLabel"])[:trainElements],
+                    "test": os.listdir(self.pathImages["train"])[trainElements:trainElements+testElements],
+                    "testLabel": os.listdir(self.pathImages["trainLabel"])[trainElements:trainElements+testElements],
+                    "validation": os.listdir(self.pathImages["train"])[trainElements+testElements if testElements > 0 else trainElements:],
+                    "validationLabel": os.listdir(self.pathImages["trainLabel"])[trainElements+testElements if testElements > 0 else trainElements:],    
                 }
 
-            else:
+                self.config["trainSize"] = len(self.imageData["train"])
+                self.config["testSize"] = len(self.imageData["test"])
+                self.config["validationSize"] = len(self.imageData["validation"])
 
-                self.imageData = {
-                    "train": os.listdir(self.pathImages["train"]),
-                    "label": os.listdir(self.pathImages["label"])
-                }
+                print("trainSize: ", self.config["trainSize"], " Testsize: ", self.config["testSize"], "Validationsize: ", self.config["validationSize"])
+
         else:
-            self.imageData = np.load(self.config["path"]+self.config["fileName"])
+            self.imageData = np.load(self.config["fileName"]+".npy")
+            self.config["trainSize"] = len(self.imageData.item().get("train"))
+            self.config["testSize"] = len(self.imageData.item().get("test"))
+            self.config["validationSize"] = len(self.imageData.item().get("validation"))
             print("Finished loading dataset...")
 
 
@@ -125,25 +135,26 @@ class Data:
     # bool balanced returns an dataset that has even amount of every class set by the smallest class -> extreme balancing
     def getDataset(self, balanced=False):
         
-        trainData = np.empty((self.config["size"], self.config["x"], self.config["y"], self.config["imageChannels"]), dtype=np.float64)
-        labelData = np.empty((self.config["size"], self.config["classes"]), dtype=np.uint8)
-
-        # can not select ranges from with [:,0], only [i,0] works
-        # therefore seperate lists has to be made
-        for i in range(0, self.config["size"]):
-            if self.config["imageChannels"] == 3:
-                img = np.expand_dims(cv2.resize(self.imageData[i,0], (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST), axis=3)
-                trainData[i] = np.append(np.append(img, img, axis=2), img, axis=2)
-            else:
-                trainData[i] = self.imageData[i,0]
-            
-            labelData[i] = self.imageData[i,1]
+       
+        dataSet = {
+            "train": None,
+            "trainLabel": None,
+            "test": None,
+            "testLabel": None,
+            "validation": None,
+            "validationLabel": None
+        }
         
+        # fill the sets with the appropiate pre-processed images
+        for set in ["train", "test", "validation"]:
+            dataSet[set] = np.array([self.getImage(x, set) for x in range(self.config[set+"Size"])])
+            dataSet[set+"Label"] = np.array([self.getImage(x, set+"Label") for x in range(self.config[set+"Size"])])
+                
         if balanced:
-            classes = np.argmax(labelData, axis=1)
+            classes = np.argmax(dataSet["label"], axis=1)
             smallestClassCount = np.bincount(classes).min()
             smallestClass = np.argmin(np.bincount(classes))
-            print("Smallest Class with ", smallestClassCount, " elements is class ", smallestClass, " from ", np.bincount(np.argmax(labelData, axis=1)))
+            print("Smallest Class with ", smallestClassCount, " elements is class ", smallestClass, " from ", np.bincount(np.argmax(dataSet["label"], axis=1)))
             
             classIndices = [[0] * 10000 for i in range(self.config["classes"])]#np.array((self.config["classes"], self.config["size"]))
 
@@ -151,7 +162,6 @@ class Data:
                 classIndices[classNr] = [el[:smallestClassCount] for el in np.where((classes == classNr))]
 
             # this part is way to slow: 10 minutes for 500 elements
-            # stays commented for educational purposes
             # for idx, x in enumerate(np.argmax(labelData, axis=1)):
             #     print(idx)
             #     if classCounts[x] > smallestClass:
@@ -162,87 +172,115 @@ class Data:
             np.random.shuffle(classIndices)
             classIndices = np.asarray(classIndices)
             classIndices = classIndices.flatten()
-            trainData = trainData[classIndices]
-            labelData = labelData[classIndices]
+            dataSet["train"] = dataSet["train"][classIndices]
+            dataSet["trainLabel"] = dataSet["trainLabel"][classIndices]
+            
 
-        return np.array(trainData), np.array(labelData)
+        return dataSet
+    
     
     
     # reads an image and pre-processes it for training/testing
     # int i - index for the image
-    # string type - wether it is a train or label image
     def getImage(self, i, type):
         imageName = self.imageData[type][i]
-        
+                
         if self.config["preProcessedPath"] != "":
-            if type == "label":
+            if type == "trainLabel":
                 return cv2.imread(self.pathImages[type]+imageName)[:,:,0]
             else:
                 return cv2.imread(self.pathImages[type]+imageName)
 
         img = cv2.imread(self.pathImages[type]+imageName)
-
         if self.config["downsize"]:
             img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
 
-        img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        if type == "label":
+        if type in ["trainLabel", "testLabel", "validationLabel"]:
+            
             for rgbIdx, rgbV in enumerate(self.config["ClassToRGB"]):
-                labelMask = (img == rgbV)
+                labelMask = (img == rgbV)             
                 img[labelMask] = rgbIdx
 
             return img[:,:,0]
 
-        elif type == "train":
-            #  standarsize train values to a range of [-1,1]
-            if img.std() != None :
-                return (img - img.mean()) / img.std()
-            else:
+        elif type in ["train", "test", "validation"]:
+            try:
+                #  standarsize train values to an interval of [-1,1]
+                if img.std() != None :
+                    return (img - img.mean()) / img.std()
+            except:
                 print("NONE IMG")
                 return (img - img.mean()) / 1
 
     # returns an iterator which provides on every call one batch
     # int bsize - batch size to be returned
-    def getNextBatchTrain(self, bsize):
-        batchCount = list(range(int(self.config["trainsize"]*(int(self.config["size"])/bsize))))
-        np.random.shuffle(batchCount)
-        for x in batchCount:
+    # int seed - needed in order to get a unison shuffle
+    def getNextBatchTrain(self, bsize, randSeed):
+        #batchCount = list(range(int(self.config["trainSize"]*(int(self.config["size"])/bsize))))
+        trainElements = list(range(int(self.config["trainSize"])))
+        #batchCount = self.config["trainSize"]/bsize
+        np.random.seed(randSeed)
+        np.random.shuffle(trainElements)
+        
+        for x in trainElements:
             data = [[],[]]
-            for i in range(bsize):
-                #label
-                data[0].append(self.imageData[x+i, 1] if self.config["serializedObject"] else self.getImage(x+i, "label"))
-                #train
-                data[1].append(self.imageData[x+i, 0] if self.config["serializedObject"] else self.getImage(x+i, "train"))
-
+            #label
+            data[0].append(self.imageData.item().get("trainLabel")[x] if self.config["serializedObject"] else self.getImage(x, "trainLabel"))
+            #train
+            data[1].append(self.imageData.item().get("train")[x] if self.config["serializedObject"] else self.getImage(x, "train"))
+            
             yield np.asarray(data[0]), np.asarray(data[1])
 
     # returns a batch of test data
     # int testsize - size of the to be returned test data
-    def getNextBatchTest(self, testsize):
+    def getTestData(self, testsize):
         # test is considered one batch
         data = [[],[]]
-        tS = testsize#self.config["trainsize"] * self.imageData[0].size
-        batchCount = list(range(testsize))
-        for x in batchCount:
+        for x in range(testSize):
             #label
-            data[0].append(self.imageData[x+tS, 1] if self.config["serializedObject"] else self.getImage(x+tS, "label"))
+            data[0].append(self.imageData.item().get("testLabel")[x] if self.config["serializedObject"] else self.getImage(x, "testLabel"))
             #train
-            data[1].append(self.imageData[x+tS, 0] if self.config["serializedObject"] else self.getImage(x+tS, "train"))
+            data[1].append(self.imageData.item().get("test")[x] if self.config["serializedObject"] else self.getImage(x, "test"))
                 
         return np.asarray(data[0]), np.asarray(data[1])
     
     # returns a generator of test data
     # int testsize - size of the to be returned test data
-    def getNextBatchTestGenerator(self, testsize):
+    def getNextBatchTest(self, bsize, testsize):
         # test is considered one batch
+        for x in range(testsize):
+            data = [[],[]]
+            for i in range(bsize):
+                #label
+                data[0].append(self.imageData.item().get("testLabel")[x] if self.config["serializedObject"] else self.getImage(x+i, "testLabel"))
+                #train
+                data[1].append(self.imageData.item().get("test")[x] if self.config["serializedObject"] else self.getImage(x+i, "test"))
+
+            yield np.asarray(data[0]), np.asarray(data[1])
+
+    # returns a batch of validation data
+    # int validation size - size of the to be returned validation data
+    def getValidationData(self, validationSize):
         data = [[],[]]
-        tS = testsize#self.config["trainsize"] * self.imageData[0].size
-        batchCount = list(range(testsize))
-        for x in batchCount:
+        for x in range(validationSize):
             #label
-            data[0].append(self.imageData[x+tS, 1] if self.config["serializedObject"] else getImage(x+tS, "label"))
+            data[0].append(self.imageData.item().get("validationLabel")[x] if self.config["serializedObject"] else self.getImage(x, "validationLabel"))
             #train
-            data[1].append(self.imageData[x+tS, 0] if self.config["serializedObject"] else getImage(x+tS, "train"))
-                
-        yield np.asarray(data[0]), np.asarray(data[1])
+            data[1].append(self.imageData.item().get("validation")[x] if self.config["serializedObject"] else self.getImage(x, "validation"))
+            
+        return np.asarray(data[0]), np.asarray(data[1])
+
+    # returns a batch of validation data
+    # int validation size - size of the to be returned validation data
+    def getNextBatchValidation(self, bsize, validationSize):
+        for x in range(validationSize):
+            data = [[],[]]
+            for i in range(bsize):
+                #label
+                data[0].append(self.imageData.item().get("validationLabel")[x] if self.config["serializedObject"] else self.getImage(x+i, "validationLabel"))
+                #train
+                data[1].append(self.imageData.item().get("validation")[x] if self.config["serializedObject"] else self.getImage(x+i, "validation"))
+
+            yield np.asarray(data[0]), np.asarray(data[1])
