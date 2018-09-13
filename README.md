@@ -24,13 +24,25 @@ Usage:
 ```
 python3 main.py <MODE> <NeuralNetwork>
 ```
-Whereas MODE can be either train, predict or eval. The names of the neural networks are the filename without the .py extension.
+
+Whereas MODE can be either train, predict or eval. The names of the neural networks are the filename without the .py extension. Information about the modes:
+* train - trains the current neural network with the current dataset
+* predict - creates an segmented image with the name "predict.png" and outputs it in the root folder
+* eval - evaluates the test split of the dataset with the metrics in metricsSemSeg.py
+* serialize - serializes the dataset(pre-processed) into an numpy object. This object can be loaded into memory thus accelerating the training process immensely. Works only when in config the attribute "serializedObject" is set to false otherwise it tries to read a serialized object.
+
+Example call:
+
+```
+python3 main.py train refineNet
+```
+
 The model is saved into a folder named models which is two directories above relative to the main file. The same for the tensorflow log files which are located in ../../logs and the dataset folder in ../../data.
 
 Main JSON config file:
 
 * batchSize: Batchsize for every train round
-* steps: How many steps each epoch should at least be done,
+* steps: How many steps each epoch should at least be done. Is only effective when smaller then dataset,
 * dataset: A name for the dataset,
 * classes: How many classes are to be differentiated with the model,
 * neuralNetwork: Name of the neural network,

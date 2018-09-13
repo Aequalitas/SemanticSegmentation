@@ -1,13 +1,14 @@
 #!/usr/bin/python
 
-# Martin Kersner, m.kersner@gmail.com
-# 2015/11/30
+'''
+Martin Kersner, m.kersner@gmail.com
+2015/11/30
 
-# Evaluation metrics for image segmentation inspired by
-# paper Fully Convolutional Networks for Semantic Segmentation.
+Evaluation metrics for image segmentation inspired by
+paper Fully Convolutional Networks for Semantic Segmentation.
 
-# https://github.com/martinkersner/py_img_seg_eval
-
+https://github.com/martinkersner/py_img_seg_eval
+'''
 
 import numpy as np
 

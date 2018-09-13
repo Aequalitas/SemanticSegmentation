@@ -12,7 +12,7 @@ def bias_variable(shape, name):
   initial = tf.constant(0.1, shape=shape, name=name)
   return tf.Variable(initial)
 
-def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.25):
+def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.65):
     f = weight_variable(filter, name+"f1")
 
     if not dilation > 0:
@@ -27,7 +27,7 @@ def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.25):
     if leakyR:
         relu = tf.nn.leaky_relu(batch_norm,alpha=0.2,name=None)
 
-    #drop = tf.nn.dropout(relu, dropR)
+    drop = tf.nn.dropout(relu, dropR)
 
     print(name +": ", conv.get_shape())
     #tf.summary.scalar(name, tf.reduce_sum(conv))
@@ -72,14 +72,14 @@ def deconv_filter(shape, name):
     return tf.get_variable(name, shape=shape,
            initializer=tf.contrib.layers.xavier_initializer())
 
-def deconv(layer, outputShape, filterShape, name):
+def deconv(layer, outputShape, filterShape, name, stride=2):
     filter = deconv_filter(filterShape, "deconvF"+layer.name[:len(layer.name)-2])
 
     deconv = tf.nn.conv2d_transpose(
             layer,
             filter,
             outputShape,
-            strides=[1,STRIDE,STRIDE,1],
+            strides=[1,stride,stride,1],
             padding="SAME",
             name=name
         )

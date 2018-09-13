@@ -1,4 +1,4 @@
-# dataset provider for machine learning frameworks
+# dataset provider for classifications
 
 import os 
 import cv2
@@ -24,16 +24,24 @@ class Data:
     def loadDataset(self):
         self.pathImages = {
             "train": self.config["path"],
-            "label": self.config["path"]
+            "trainLabel": self.config["path"],
+            "test" : self.config["path"],
+            "testLabel": self.config["path"],
+            "validation": self.config["path"],
+            "validationLabel": self.config["path"]
         }
 
         if self.config["preProcessedPath"] != "":
             self.pathImages["train"] += self.config["preProcessedPath"]+self.config["images"]
-            self.pathImages["label"] += self.config["preProcessedPath"]+self.config["labels"]
+            self.pathImages["trainLabel"] += self.config["preProcessedPath"]+self.config["labels"]
         else:
             self.pathImages["train"] += self.config["images"]
-            self.pathImages["label"] += self.config["labels"]
-            
+            self.pathImages["trainLabel"] += self.config["labels"]
+            self.pathImages["test"] += self.config["images"]
+            self.pathImages["testLabel"] += self.config["labels"]
+            self.pathImages["validation"] += self.config["images"]
+            self.pathImages["validationLabel"] += self.config["labels"]
+
         if not self.config["serializedObject"]:
                 trainElements = int(self.config["trainSize"]*self.config["size"])
                 testElements = int(self.config["testSize"]*self.config["size"])
@@ -47,14 +55,15 @@ class Data:
                     "validationLabel": os.listdir(self.pathImages["trainLabel"])[trainElements+testElements if testElements > 0 else trainElements:],    
                 }
 
-                self.config["trainSize"] = len(self.imageData["train"])
-                self.config["testSize"] = len(self.imageData["test"])
-                self.config["validationSize"] = len(self.imageData["validation"])
+            self.config["trainSize"] = len(self.imageData["train"])
+            self.config["testSize"] = len(self.imageData["test"])
+            self.config["validationSize"] = len(self.imageData["validation"])
 
-                print("trainSize: ", self.config["trainSize"], " Testsize: ", self.config["testSize"], "Validationsize: ", self.config["validationSize"])
+            print("trainSize: ", self.config["trainSize"], " Testsize: ", self.config["testSize"], "Validationsize: ", self.config["validationSize"])
 
         else:
-            self.imageData = np.load(self.config["fileName"]+".npy")
+            
+            self.imageData = np.load("data/"+self.config["fileName"]+".npy")
             self.config["trainSize"] = len(self.imageData.item().get("train"))
             self.config["testSize"] = len(self.imageData.item().get("test"))
             self.config["validationSize"] = len(self.imageData.item().get("validation"))
@@ -69,6 +78,7 @@ class Data:
         except:
             raise "Wrong path for data config file given!"
 
+    
         self.loadDataset()
 
     # gets a value from the config file with its given name
@@ -77,7 +87,8 @@ class Data:
 
     # calculates the class weights for the current dataset
     # string weightType - how the class weights are calculated
-    def getClassWeights(self, weightType):
+    # [trainData, labelData] dataSet - if there is another dataset than self.getDataset() eg. balanced
+    def getClassWeights(self, weightType, dataSet=None):
    
         if not weightType in ["Freq", "MedianFreq", "1x", "2x", "division"]:
             raise ValueError("Wrong weights calc type given! Valid arguments are [Freq, MedianFreq, 1x, 2x, division]")
@@ -129,13 +140,12 @@ class Data:
         print(classWeights.shape)
         print(classWeights)
 
-        return classWeights
+        np.save("classWeights"+weightType+str(self.config["x"])+str(self.config["y"])+self.config["name"], classWeights)
     
     # get the whole dataset as an numpy object
-    # bool balanced returns an dataset that has even amount of every class set by the smallest class -> extreme balancing
-    def getDataset(self, balanced=False):
+    # bool balanced returns an train dataset that has even amount of every class set by the smallest class -> extreme balancing
+    def getDataset(self, balanced=False, flipH=False):
         
-       
         dataSet = {
             "train": None,
             "trainLabel": None,
@@ -162,6 +172,7 @@ class Data:
                 classIndices[classNr] = [el[:smallestClassCount] for el in np.where((classes == classNr))]
 
             # this part is way to slow: 10 minutes for 500 elements
+            # stays commented for educational purposes
             # for idx, x in enumerate(np.argmax(labelData, axis=1)):
             #     print(idx)
             #     if classCounts[x] > smallestClass:
@@ -174,10 +185,14 @@ class Data:
             classIndices = classIndices.flatten()
             dataSet["train"] = dataSet["train"][classIndices]
             dataSet["trainLabel"] = dataSet["trainLabel"][classIndices]
-            
+        
+        # flip images horizontally
+        if flipH:
+            for set in ["train", "test", "validation"]:
+                dataSet[set] = np.append(dataSet[set], [np.fliplr(x) for x in dataSet[set]], axis=0)
+                dataSet[set+"Label"] = np.append(dataSet[set+"Label"], [np.fliplr(x) for x in dataSet[set+"Label"]], axis=0)
 
         return dataSet
-    
     
     
     # reads an image and pre-processes it for training/testing

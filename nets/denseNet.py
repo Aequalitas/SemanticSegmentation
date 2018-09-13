@@ -25,12 +25,12 @@ def denseBlock(input, layerCount, depth, name, _transitionDown=True):
 
     return currLayer
 
-def getOutPutShape(targetShape, targetDepth):
-    return tf.constant([targetShape[0], targetShape[1], targetShape[2], targetDepth])
+def getOutputShape(targetShape, targetDepth):
+    return tf.TensorShape([targetShape[0], targetShape[1], targetShape[2], targetDepth])
 
 def net(image, classes):
 
-    initDepth = 20
+    initDepth = 128
 
     conv1 = util.conv(image, [K,K,3,initDepth], "c1", pad="SAME")
     
@@ -43,23 +43,23 @@ def net(image, classes):
     dB6 = denseBlock(dB5, 15, initDepth*7, "DB6", _transitionDown=False)
 
     # transition upwards 
-    deconv1 = util.deconv(dB6, tf.shape(dB4), [K,K,initDepth*6,initDepth*7], "dc1")    
+    deconv1 = util.deconv(dB6, getOutputShape(dB4.get_shape(),initDepth*6), [K,K,initDepth*6,initDepth*7], "dc1")    
     dB7 = denseBlock(deconv1, 12, initDepth*6, "DB7", _transitionDown=False)    
-    deconv2 = util.deconv(dB7, tf.shape(dB3), [K,K,initDepth*5,initDepth*6], "dc2")    
+    deconv2 = util.deconv(dB7, getOutputShape(dB3.get_shape(),initDepth*5), [K,K,initDepth*5,initDepth*6], "dc2")    
     dB8 = denseBlock(deconv2, 10, initDepth*5, "DB8", _transitionDown=False)
-    deconv3 = util.deconv(dB8, tf.shape(dB2), [K,K,initDepth*4,initDepth*5], "dc3")    
+    deconv3 = util.deconv(dB8, getOutputShape(dB2.get_shape(),initDepth*4), [K,K,initDepth*4,initDepth*5], "dc3")    
     dB9 = denseBlock(deconv3, 7, initDepth*4, "DB9", _transitionDown=False)
-    deconv4 = util.deconv(dB9, tf.shape(dB1), [K,K,initDepth*3,initDepth*4], "dc4")    
+    deconv4 = util.deconv(dB9, getOutputShape(dB1.get_shape(),initDepth*3), [K,K,initDepth*3,initDepth*4], "dc4")    
     dB10 = denseBlock(deconv4, 5, initDepth*3, "DB10", _transitionDown=False)
-    deconv5 = util.deconv(dB10, tf.shape(conv1), [K,K,initDepth*2,initDepth*3], "dc5")    
+    deconv5 = util.deconv(dB10, getOutputShape(conv1.get_shape(), initDepth*2), [K,K,initDepth*2,initDepth*3], "dc5")    
 
     # no denseBlock function for the last denseBlock because of structure within nnUtils
-    # these convs contain bNorm and relu after conv and not before as described in the paper
-    conv2 = tf.nn.conv2d(deconv5, util.weight_variable([K,K,initDepth*2,initDepth*2], "c2"), strides=[1,1,1,1], padding="SAME")
+    # these convs contain bNorm and relu after conv
+    conv2 = tf.nn.conv2d(deconv5, util.weight_variable([K,K,initDepth*2, initDepth], "c2"), strides=[1,1,1,1], padding="SAME")
     drop = tf.nn.dropout(conv2, 0.2)
 
-    conv3 = tf.nn.conv2d(drop, util.weight_variable([1,1, initDepth*2, classes], "c3"), strides=[1,1,1,1], padding="SAME")
+    conv3 = tf.nn.conv2d(drop, util.weight_variable([1,1, initDepth, classes], "c3"), strides=[1,1,1,1], padding="SAME")
 
     softmax = tf.nn.softmax(conv3)
 
-    return conv3, tf.argmax(softmax, axis=3)
+    return conv3, tf.argmax(softmax, axis=3), softmax

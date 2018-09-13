@@ -1,5 +1,5 @@
 # Semantic Segmentation with Tensorflow
-# Franz Weidmann www.github.com/Aequalitas/SemanticSegmentation
+# by Franz Weidmann www.github.com/Aequalitas
 
 import tensorflow as tf
 import os
@@ -11,21 +11,22 @@ from graph import buildGraph
 from train import doTrain
 from predict import predict
 from evaluate import evaluate
+from runLengthEncoding import runLenEncodeTestSet
 
 MODE = sys.argv[1]
-if MODE == 'train' or MODE == 'predict' or MODE == 'eval' or MODE == 'serialize':
+if MODE == 'train' or MODE == 'predict' or MODE == 'eval' or MODE == 'serialize' or MODE == "runLenEncode":
     print("MODE: ", MODE)
 else: 
-    raise Exception("Provide one argument: train, eval, predict or serialize!")
+    raise Exception("Provide one argument: train, eval, predict, runLenEncode or serialize!")
 
 # load config for tensorflow procedure from json
-config = json.load(open(sys.argv[2]+"Config.json"))
+config = json.load(open("nets/"+sys.argv[2]+"Config.json"))
 # load data object initially which provides training and test data loader
-data = Data("configData.json", sys.argv[3])
+data = Data("data/configDataTGS.json")
 
 if MODE == "serialize":
     if data.config["fileName"] != "":
-        np.save(data.config["fileName"], data.getDataset())
+        np.save(data.config["fileName"], data.getDataset(flipH=True))
     else:
         print("You have to set a filename for the serialized file in the config file!")
     exit()
@@ -34,7 +35,7 @@ if MODE == "serialize":
 graph = buildGraph(data, config)
 
 
-os.environ["CUDA_VISIBLE_DEVICES"]=sys.argv[4]#config["gpu"]
+os.environ["CUDA_VISIBLE_DEVICES"]=config["gpu"]
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
@@ -65,3 +66,5 @@ with tf.Session() as sess:
         evaluate(sess, config, data, graph)
     elif MODE == "predict":
         predict(sess, config, data, graph)
+    elif MODE == "runLenEncode":
+        runLenEncodeTestSet(sess, config, data, graph)

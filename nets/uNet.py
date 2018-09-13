@@ -9,8 +9,10 @@ STRIDE = 2
 
 def net(image, classes):
 
+    #image = tf.image.resize_images(image, [101,101])#, method=ResizeMethod.NEAREST_NEIGHBOR)
     bsize = image.get_shape()[0].value
     f = 3 # kernel size
+    #tf.summary.scalar("input", tf.reduce_sum(image))
 
     #encoding - downsampling
     # encoding level 1
@@ -19,6 +21,8 @@ def net(image, classes):
     e1_c3 = util.conv(e1_c2, [f,f,64,64], "e1_c3", "VALID")
     pool1 = util.pool(e1_c3, 2, 2, name="pool1")
 
+    #tf.summary.scalar("e1_c1", tf.reduce_sum(e1_c1))
+
 
     # encoding level 2
     e2_c1 = util.conv(pool1, [f,f,64,128], "e2_c1", "VALID")
@@ -26,6 +30,8 @@ def net(image, classes):
     e2_c3 = util.conv(e2_c2, [f,f,128,128], "e2_c3", "VALID")
     pool2 = util.pool(e2_c3, 2, 2, name="pool2")
     
+    tf.summary.scalar("e2_c1", tf.reduce_sum(e2_c1))
+
     # encoding level 3
     e3_c1 = util.conv(pool2, [f,f,128,256], "e3_c1", "VALID")
     e3_c2 = util.conv(e3_c1, [f,f,256,256], "e3_c2", "VALID")
@@ -33,11 +39,15 @@ def net(image, classes):
     pool3 = util.pool(e3_c3, 2, 2, name="pool3")
 
 
+    #tf.summary.scalar("e3_c1", tf.reduce_sum(e3_c1))
+
     # encoding level 4
     e4_c1 = util.conv(pool3, [f,f,256,512], "e4_c1", "VALID")
     e4_c2 = util.conv(e4_c1, [f,f,512,512], "e4_c2", "VALID")
     e4_c3 = util.conv(e4_c2, [f,f,512,512], "e4_c3", "VALID")
     pool4 = util.pool(e4_c3, 2, 2, name="pool4")
+
+    #tf.summary.scalar("e4_c1", tf.reduce_sum(e4_c1))
 
 
     # encoding level 5
@@ -45,6 +55,9 @@ def net(image, classes):
     e5_c2 = util.conv(e5_c1, [f,f,1024,1024], "e5_c2", "VALID")
     deOut = [bsize, e5_c2.get_shape()[1].value*STRIDE, e5_c2.get_shape()[2].value*STRIDE, 512]
     de_dc1 = util.deconv(e5_c2, deOut, [f, f, 512, 1024], "de_dc1")
+    #tf.summary.scalar("e5_c2", tf.reduce_sum(e5_c2))
+    #tf.summary.scalar("de_dc1", tf.reduce_sum(de_dc1))
+
 
     # decoding - upsampling 
     # decoding level 1   
@@ -76,7 +89,9 @@ def net(image, classes):
     de4_c4 = util.conv(de4_c3, [f,f,64,64], "de4_c4", "SAME")
 
     final = util.conv(de4_c4, [1,1,64,classes], "final", "SAME")
+    #tf.summary.scalar("final", tf.reduce_sum(final))
 
+    final = tf.image.resize_images(final, [101,101])
     softmax = tf.nn.softmax(final)
 
-    return final, tf.argmax(softmax, axis=3)
+    return final, tf.argmax(softmax, axis=3), softmax

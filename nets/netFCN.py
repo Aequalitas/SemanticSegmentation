@@ -1,5 +1,3 @@
-# simple fully convolutional neural network
-
 import tensorflow as tf
 import nnUtils as util
 
@@ -10,13 +8,13 @@ def net(image, classes):
 
     #encoding - convolution/pooling
     conv1 = util.conv(image, [K,K,3,128], "c1", pad="SAME")
-    pool1 = util.pool(conv1, 2, STRIDE, name="p1") 
+    pool1 = util.pool(conv1, 1, STRIDE, name="p1") 
     
     conv2 = util.conv(pool1, [K,K,128,256], "c2", pad="SAME")
-    pool2 = util.pool(conv2, 2, STRIDE, name="p2")  
+    pool2 = util.pool(conv2, 1, STRIDE, name="p2")  
     
     conv3 = util.conv(pool2, [K,K,256,256], "c3", pad="SAME")
-    pool3 = util.pool(conv3, 2, STRIDE, name="p2")
+    pool3 = util.pool(conv3, 1, STRIDE, name="p2")
     
     conv4 = util.conv(pool3, [K,K, 256, 512], "c4", pad="SAME")
 

@@ -7,7 +7,7 @@ from PIL import Image
 
 def predict(sess, config, data, graph):
 
-    imagePath = "predict.jpg"
+    imagePath = "../testImages/predict.png"
 
     img = cv2.imread(imagePath)  
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -19,8 +19,6 @@ def predict(sess, config, data, graph):
     }
 
     predClasses = sess.run(graph["prediction"], feed_dict=feed_dict)
-    print(predClasses)
-
     predClasses = predClasses.reshape(data.config["x"]*data.config["y"])
     predImg = np.zeros((data.config["x"]*data.config["y"],3))
 
@@ -28,6 +26,8 @@ def predict(sess, config, data, graph):
     for idx, p in enumerate(predClasses):
         predImg[idx] = data.config["ClassToRGB"][p]
 
+   
     predImg = predImg.reshape((data.config["y"], data.config["x"], data.config["imageChannels"])).astype("uint8")
-
-    Image.fromarray(predImg, "RGB").save(data.config["name"]+str(data.config["x"])+str(data.config["y"])+config["neuralNetwork"]+str(config["learningRate"])+"LRAdamOpt.png")
+    print(predClasses)
+    print(predImg)
+    Image.fromarray(predImg, "RGB").save("../results/"+str(data.config["depth"])+"meter"+data.config["name"]+str(data.config["x"])+str(data.config["y"])+config["neuralNetwork"]+".png")

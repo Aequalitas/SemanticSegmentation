@@ -50,6 +50,7 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
             status += " || loss:"+str(round(np.mean(np.array(loss)), 3))+" || train_accuracy:"+ str(round(np.mean(np.array(train_acc)), 3))
             status += "% || time 1 step with batch of "+str(config["batchSize"])+": "+str(round(end-start, 3))
 
+            # ends with \r to delete the older line so the new line can be printed
             print(status, end="\r")            
 
         if step >= data.config["size"]:
