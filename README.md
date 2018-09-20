@@ -54,7 +54,8 @@ Dataset JSON config file:
 
 * name: Name of the dataset,
 * size: Int, size of the dataset,
-* trainsize: float, percentage for how big the train size should be e.g. 95% of the dataset -> 0.95,
+* trainSize: float, percentage for how big the train size should be e.g. 95% of the dataset -> 0.95,
+* testSize: float, percentage for the test size
 * x: int, x value of the to be used image,
 * y: int, y value of the to be used image,
 * imageChannels: int, how many channels does the input image have,

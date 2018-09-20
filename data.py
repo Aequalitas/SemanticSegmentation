@@ -8,6 +8,7 @@ from PIL import Image
 import sys 
 import json
 from time import sleep
+from IPython.display import display 
 
 
 class Data:
@@ -43,16 +44,42 @@ class Data:
             self.pathImages["validationLabel"] += self.config["labels"]
 
         if not self.config["serializedObject"]:
+            if self.config["name"] == "Seagrass":       
+                jsonData = json.load(open(self.config["path"]+"train.json"))
+                trainData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                labelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                
+                jsonData = json.load(open(self.config["path"]+"test.json"))
+                testData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                testLabelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                
+                jsonData = json.load(open(self.config["path"]+"validate.json"))
+                validateData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                validateLabelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+
+
+                self.imageData = {
+                    "train": list(filter(lambda i:i != None, trainData)),
+                    "trainLabel": list(filter(lambda i:i != None, labelData)),
+                    "test": list(filter(lambda i:i != None, testData)),
+                    "testLabel": list(filter(lambda i:i != None, testLabelData)),
+                    "validation": list(filter(lambda i:i != None, validateData)),
+                    "validationLabel": list(filter(lambda i:i != None, validateLabelData))
+                }
+                
+
+            else:
+
                 trainElements = int(self.config["trainSize"]*self.config["size"])
                 testElements = int(self.config["testSize"]*self.config["size"])
-                
+
                 self.imageData = {
                     "train": os.listdir(self.pathImages["train"])[:trainElements],
                     "trainLabel": os.listdir(self.pathImages["trainLabel"])[:trainElements],
                     "test": os.listdir(self.pathImages["train"])[trainElements:trainElements+testElements],
                     "testLabel": os.listdir(self.pathImages["trainLabel"])[trainElements:trainElements+testElements],
                     "validation": os.listdir(self.pathImages["train"])[trainElements+testElements if testElements > 0 else trainElements:],
-                    "validationLabel": os.listdir(self.pathImages["trainLabel"])[trainElements+testElements if testElements > 0 else trainElements:],    
+                    "validationLabel": os.listdir(self.pathImages["trainLabel"])[trainElements+testElements if testElements > 0 else trainElements:],
                 }
 
             self.config["trainSize"] = len(self.imageData["train"])
@@ -62,8 +89,8 @@ class Data:
             print("trainSize: ", self.config["trainSize"], " Testsize: ", self.config["testSize"], "Validationsize: ", self.config["validationSize"])
 
         else:
-            
-            self.imageData = np.load("data/"+self.config["fileName"]+".npy")
+
+            self.imageData = np.load(self.config["path"]+self.config["fileName"]+".npy")
             self.config["trainSize"] = len(self.imageData.item().get("train"))
             self.config["testSize"] = len(self.imageData.item().get("test"))
             self.config["validationSize"] = len(self.imageData.item().get("validation"))
@@ -157,8 +184,9 @@ class Data:
         
         # fill the sets with the appropiate pre-processed images
         for set in ["train", "test", "validation"]:
-            dataSet[set] = np.array([self.getImage(x, set) for x in range(self.config[set+"Size"])])
-            dataSet[set+"Label"] = np.array([self.getImage(x, set+"Label") for x in range(self.config[set+"Size"])])
+            size = self.config[set+"Size"]
+            dataSet[set] = np.array([self.getImage(x, set) for x in range(size)])
+            dataSet[set+"Label"] = np.array([self.getImage(x, set+"Label") for x in range(size)])
                 
         if balanced:
             classes = np.argmax(dataSet["label"], axis=1)
@@ -198,8 +226,7 @@ class Data:
     # reads an image and pre-processes it for training/testing
     # int i - index for the image
     def getImage(self, i, type):
-        imageName = self.imageData[type][i]
-                
+        imageName = self.imageData[type][i]        
         if self.config["preProcessedPath"] != "":
             if type == "trainLabel":
                 return cv2.imread(self.pathImages[type]+imageName)[:,:,0]
@@ -207,17 +234,24 @@ class Data:
                 return cv2.imread(self.pathImages[type]+imageName)
 
         img = cv2.imread(self.pathImages[type]+imageName)
+        
         if self.config["downsize"]:
             img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
-
+        
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        #print(self.pathImages[type]+imageName, img.mean())
+        #display(Image.fromarray(img, "RGB"))
+
 
         if type in ["trainLabel", "testLabel", "validationLabel"]:
             
             for rgbIdx, rgbV in enumerate(self.config["ClassToRGB"]):
                 labelMask = (img == rgbV)             
                 img[labelMask] = rgbIdx
-
+            
+            
+            #print("Label: "+imageName+" ", img[:,:,0].max(), img[:,:,0].min(), img[:,:,0].mean())
             return img[:,:,0]
 
         elif type in ["train", "test", "validation"]:

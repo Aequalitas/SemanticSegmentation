@@ -39,6 +39,7 @@ def buildGraph(data, config):
     # optimizer
     LR = tf.train.exponential_decay(LR, global_step, 10000, 0.96, staircase=True)
     tf.summary.scalar("learning_rate", LR)
+    #optimizer = tf.train.GradientDescentOptimizer(learning_rate=LR)
     optimizer = tf.train.AdamOptimizer(learning_rate=LR, name="AdamOpt")
     train_op = optimizer.minimize(loss, global_step=global_step)
     # grads = optimizer.compute_gradients(loss, var_list=tf.trainable_variables())
@@ -58,6 +59,7 @@ def buildGraph(data, config):
     writer = tf.summary.FileWriter("../../logs/", graph=tf.get_default_graph())
 
     return {
+        "logits":logits,
         "loss": loss,
         "mergedLog": merged,
         "prediction": predictionNet,

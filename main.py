@@ -5,28 +5,34 @@ import tensorflow as tf
 import os
 import numpy as np
 import sys
-from data import Data
 import json
+import faulthandler
+
+from data import Data
 from graph import buildGraph
 from train import doTrain
 from predict import predict
 from evaluate import evaluate
+faulthandler.enable()
 from runLengthEncoding import runLenEncodeTestSet
 
 MODE = sys.argv[1]
 if MODE == 'train' or MODE == 'predict' or MODE == 'eval' or MODE == 'serialize' or MODE == "runLenEncode":
     print("MODE: ", MODE)
-else: 
+else:
     raise Exception("Provide one argument: train, eval, predict, runLenEncode or serialize!")
 
-# load config for tensorflow procedure from json
+
+#load config for tensorflow procedure from json
 config = json.load(open("nets/"+sys.argv[2]+"Config.json"))
 # load data object initially which provides training and test data loader
-data = Data("data/configDataTGS.json")
+data = Data("../data/"+config["dataset"]+"/configData"+config["dataset"]+".json")
 
 if MODE == "serialize":
+    print("Serializing dataset to ",data.config["path"]+data.config["fileName"])
+ 
     if data.config["fileName"] != "":
-        np.save(data.config["fileName"], data.getDataset(flipH=True))
+        np.save(data.config["path"]+data.config["fileName"], data.getDataset(flipH=True))
     else:
         print("You have to set a filename for the serialized file in the config file!")
     exit()
@@ -42,7 +48,7 @@ tf.logging.set_verbosity(tf.logging.INFO)
 with tf.Session() as sess:
 
     sess.run(tf.global_variables_initializer())
-    modelFileName = "../../models/model"+str(data.config["x"])+str(data.config["y"])+data.config["name"]+config["neuralNetwork"]+".ckpt"
+    modelFileName = "../models/model"+str(data.config["x"])+str(data.config["y"])+data.config["name"]+config["neuralNetwork"]+".ckpt"
     try:
         graph["saver"].restore(sess, modelFileName)
     except:

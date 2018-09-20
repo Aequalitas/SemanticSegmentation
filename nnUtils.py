@@ -3,16 +3,16 @@ import tensorflow as tf
 STRIDE = 2
 
 def weight_variable(shape, name):
-  #initial = tf.truncated_normal(shape, stddev=0.1, name=name)
-  #return tf.Variable(initial)
-  return tf.get_variable(name, shape=shape,
-           initializer=tf.contrib.layers.xavier_initializer())#tf.initializers.orthogonal())
+      #initial = tf.truncated_normal(shape, stddev=0.1, name=name)
+      #return tf.Variable(initial)
+      return tf.get_variable(name, shape=shape,
+               initializer=tf.contrib.layers.xavier_initializer())#tf.initializers.orthogonal())
 
 def bias_variable(shape, name):
-  initial = tf.constant(0.1, shape=shape, name=name)
-  return tf.Variable(initial)
+    initial = tf.constant(0.1, shape=shape, name=name)
+    return tf.Variable(initial)
 
-def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.65):
+def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.20):
     f = weight_variable(filter, name+"f1")
 
     if not dilation > 0:
@@ -21,18 +21,18 @@ def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.65):
         conv = tf.nn.atrous_conv2d(input, f, dilation, padding=pad)
     
     conv_bias = tf.nn.bias_add(conv, bias_variable([filter[3]], name=name+"b1"))
-    batch_norm = tf.contrib.layers.batch_norm(conv_bias)
+    #batch_norm = tf.contrib.layers.batch_norm(conv_bias)
     
-    relu = tf.nn.relu(batch_norm)
+    relu = tf.nn.relu(conv_bias)
     if leakyR:
         relu = tf.nn.leaky_relu(batch_norm,alpha=0.2,name=None)
 
     drop = tf.nn.dropout(relu, dropR)
 
-    print(name +": ", conv.get_shape())
+    #print(name +": ", conv.get_shape())
     #tf.summary.scalar(name, tf.reduce_sum(conv))
 
-    return relu
+    return drop
     
 def pool(input, window, stride, poolIndices=False, name="POOL"):
     
@@ -54,7 +54,7 @@ def pool(input, window, stride, poolIndices=False, name="POOL"):
                 name=name
             )
 
-        print(name + ": ", pool.get_shape())
+        #print(name + ": ", pool.get_shape())
 
     
     return pool
@@ -84,5 +84,5 @@ def deconv(layer, outputShape, filterShape, name, stride=2):
             name=name
         )
     
-    print(name +": ", deconv.get_shape())
+    #print(name +": ", deconv.get_shape())
     return deconv

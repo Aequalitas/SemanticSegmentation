@@ -4,10 +4,11 @@ import numpy as np
 import csv
 import cv2
 from PIL import Image
+from IPython.display import display 
 
 def predict(sess, config, data, graph):
 
-    imagePath = "../testImages/predict.png"
+    imagePath = "../results/predict"+config["dataset"]+".jpg"
 
     img = cv2.imread(imagePath)  
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -29,5 +30,7 @@ def predict(sess, config, data, graph):
    
     predImg = predImg.reshape((data.config["y"], data.config["x"], data.config["imageChannels"])).astype("uint8")
     print(predClasses)
-    print(predImg)
-    Image.fromarray(predImg, "RGB").save("../results/"+str(data.config["depth"])+"meter"+data.config["name"]+str(data.config["x"])+str(data.config["y"])+config["neuralNetwork"]+".png")
+    savePath = "../results/"+data.config["name"]+str(data.config["x"])+str(data.config["y"])+config["neuralNetwork"]+".png"
+    savedImage = Image.fromarray(predImg, "RGB")
+    savedImage.save(savePath)
+    display(savedImage)

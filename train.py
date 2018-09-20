@@ -1,6 +1,7 @@
 import tensorflow as tf 
 import time 
 import numpy as np 
+from predict import predict
 
 
 def doTrain(epoch, sess, graph, config, data, modelFileName):
@@ -32,7 +33,11 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
             graph["trainOp"].run(feed_dict=feed_dict)
             
             end = time.time() 
-
+            
+            
+            #_logits, _loss, _prediction = sess.run([graph["logits"], graph["loss"], graph["prediction"]], feed_dict=feed_dict)
+            #print("Image: ",_image.mean(), "Label: ", _labels.mean(),"logits: ", _logits.mean(),"loss: ", _loss,"prediction: ", _prediction.mean())
+            
         else:
             print("SKIPPED INVALID STEP: ", step)    
         
@@ -52,7 +57,8 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
             # ends with \r to delete the older line so the new line can be printed
             print(status, end="\r")            
-
+            predict(sess, config, data, graph)
+            
         if step >= data.config["size"]:
             break
 
