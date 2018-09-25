@@ -8,7 +8,7 @@ from IPython.display import display
 
 def predict(sess, config, data, graph):
 
-    imagePath = "../results/predict"+config["dataset"]+".jpg"
+    imagePath = "../results/predict"+config["dataset"]+".png"
 
     img = cv2.imread(imagePath)  
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)

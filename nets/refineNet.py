@@ -5,7 +5,7 @@ STRIDE = 1
 # kernel size of the conv filter
 K = 3
 # baseDepth
-initDepth = 128
+initDepth = 256
 # Multi-Path refinement
 # Lin et al. - RefineNet: Multi-Path Refinement Networks for High-Resolution Semantic Segmentation
 # http://openaccess.thecvf.com/content_cvpr_2017/papers/Lin_RefineNet_Multi-Path_Refinement_CVPR_2017_paper.pdf

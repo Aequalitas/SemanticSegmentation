@@ -21,18 +21,18 @@ def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.20):
         conv = tf.nn.atrous_conv2d(input, f, dilation, padding=pad)
     
     conv_bias = tf.nn.bias_add(conv, bias_variable([filter[3]], name=name+"b1"))
-    #batch_norm = tf.contrib.layers.batch_norm(conv_bias)
+    batch_norm = tf.contrib.layers.batch_norm(conv_bias)
     
-    relu = tf.nn.relu(conv_bias)
+    relu = tf.nn.relu(batch_norm)
     if leakyR:
         relu = tf.nn.leaky_relu(batch_norm,alpha=0.2,name=None)
 
-    drop = tf.nn.dropout(relu, dropR)
+    #drop = tf.nn.dropout(relu, dropR)
 
     #print(name +": ", conv.get_shape())
     #tf.summary.scalar(name, tf.reduce_sum(conv))
 
-    return drop
+    return relu
     
 def pool(input, window, stride, poolIndices=False, name="POOL"):
     
