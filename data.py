@@ -3,7 +3,6 @@
 import os 
 import cv2
 import numpy as np
-import tensorflow as tf
 from PIL import Image
 import sys 
 import json
@@ -44,43 +43,25 @@ class Data:
             self.pathImages["validationLabel"] += self.config["labels"]
 
         if not self.config["serializedObject"]:
-            if self.config["name"] == "Seagrass":       
-                jsonData = json.load(open(self.config["path"]+"train.json"))
-                trainData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                labelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                
-                jsonData = json.load(open(self.config["path"]+"test.json"))
-                testData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                testLabelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                
-                jsonData = json.load(open(self.config["path"]+"validate.json"))
-                validateData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                validateLabelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+            
+            # sort data because os.listdir selects files in arbitrary order
+            trainDataFiles = os.listdir(self.pathImages["train"])
+            trainLabelDataFiles = os.listdir(self.pathImages["trainLabel"])
+            trainDataFiles.sort()
+            trainLabelDataFiles.sort()
+            
+            
+            trainElements = int(self.config["trainSize"]*self.config["size"])
+            testElements = int(self.config["testSize"]*self.config["size"])
 
-
-                self.imageData = {
-                    "train": list(filter(lambda i:i != None, trainData)),
-                    "trainLabel": list(filter(lambda i:i != None, labelData)),
-                    "test": list(filter(lambda i:i != None, testData)),
-                    "testLabel": list(filter(lambda i:i != None, testLabelData)),
-                    "validation": list(filter(lambda i:i != None, validateData)),
-                    "validationLabel": list(filter(lambda i:i != None, validateLabelData))
-                }
-                
-
-            else:
-
-                trainElements = int(self.config["trainSize"]*self.config["size"])
-                testElements = int(self.config["testSize"]*self.config["size"])
-
-                self.imageData = {
-                    "train": os.listdir(self.pathImages["train"])[:trainElements],
-                    "trainLabel": os.listdir(self.pathImages["trainLabel"])[:trainElements],
-                    "test": os.listdir(self.pathImages["train"])[trainElements:trainElements+testElements],
-                    "testLabel": os.listdir(self.pathImages["trainLabel"])[trainElements:trainElements+testElements],
-                    "validation": os.listdir(self.pathImages["train"])[trainElements+testElements if testElements > 0 else trainElements:],
-                    "validationLabel": os.listdir(self.pathImages["trainLabel"])[trainElements+testElements if testElements > 0 else trainElements:],
-                }
+            self.imageData = {
+                "train": trainDataFiles[:trainElements],
+                "trainLabel": trainLabelDataFiles[:trainElements],
+                "test": trainDataFiles[trainElements:trainElements+testElements],
+                "testLabel": trainLabelDataFiles[trainElements:trainElements+testElements],
+                "validation": trainDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
+                "validationLabel": trainLabelDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
+            }
 
             self.config["trainSize"] = len(self.imageData["train"])
             self.config["testSize"] = len(self.imageData["test"])
@@ -247,8 +228,7 @@ class Data:
         if type in ["trainLabel", "testLabel", "validationLabel"]:
             
             for rgbIdx, rgbV in enumerate(self.config["ClassToRGB"]):
-                labelMask = (img == rgbV)             
-                img[labelMask] = rgbIdx
+                img[(img == rgbV).all(-1)] = rgbIdx
             
             
             #print("Label: "+imageName+" ", img[:,:,0].max(), img[:,:,0].min(), img[:,:,0].mean())
