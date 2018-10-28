@@ -1,6 +1,8 @@
 import tensorflow as tf 
 import time 
 import numpy as np 
+import datetime
+
 from predict import predict
 
 
@@ -13,6 +15,7 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
     train_acc = []
     acc = []
 
+    feed_dict = {}
 
     for batch in data.getNextBatchTrain(config["batchSize"], step*epoch):
         
@@ -51,14 +54,22 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
             graph["logWriter"].add_summary(summary, step)
 
 
-            status = "Epoch : "+str(epoch)+" || Step: "+str(step+1)+"/"+ str(data.config["trainSize"])
-            status += " || loss:"+str(round(np.mean(np.array(loss)), 3))+" || train_accuracy:"+ str(round(np.mean(np.array(train_acc)), 3))
-            status += "% || time 1 step with batch of "+str(config["batchSize"])+": "+str(round(end-start, 3))
+            status = "Epoch : "+str(epoch)+" || Step: "+str(step)+"/"+ str(data.config["trainSize"]/config["batchSize"])
+            status += " || loss:"+str(round(np.mean(np.array(loss)), 5))+" || train_accuracy:"+ str(round(np.mean(np.array(train_acc)), 5))
+            status += "% || ETA: "+str(datetime.timedelta(seconds=((end-start)*((data.config["trainSize"]/config["batchSize"])-step))))
+            #status += "% || time 1 step with batch of "+str(config["batchSize"])+": "+str(round(end-start, 3))
 
             # ends with \r to delete the older line so the new line can be printed
             print(status, end="\r")            
             predict(sess, config, data, graph)
             
+        if step % 2000 == 0:
+            if _loss > loss[-1]:
+                save_path = graph["saver"].save(sess, modelFileName)
+                print("\nModel saved in file: %s" % save_path)
+            else:
+                print("Loss did not advance therefore not saving model")
+                
         if step >= data.config["size"]:
             break
 

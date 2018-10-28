@@ -35,8 +35,8 @@ def evaluate(sess, config, data, graph):
 
             predClasses = sess.run(graph["prediction"], feed_dict=feed_dict)
             
-            predClasses = np.squeeze(predClasses)
-            labelData = np.squeeze(labelData)
+            predClasses = np.squeeze(predClasses[0])
+            labelData = np.squeeze(labelData[0])
 
             totalCorrect += (predClasses == labelData).sum()
 

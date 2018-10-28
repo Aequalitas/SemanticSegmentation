@@ -5,14 +5,16 @@ STRIDE = 2
 def weight_variable(shape, name):
       #initial = tf.truncated_normal(shape, stddev=0.1, name=name)
       #return tf.Variable(initial)
-      return tf.get_variable(name, shape=shape,
-               initializer=tf.contrib.layers.xavier_initializer())#tf.initializers.orthogonal())
+      with tf.variable_scope("", reuse=tf.AUTO_REUSE):
+          return tf.get_variable(name, shape=shape,
+              initializer=tf.contrib.layers.xavier_initializer())#tf.initializers.orthogonal())
 
 def bias_variable(shape, name):
-    initial = tf.constant(0.1, shape=shape, name=name)
-    return tf.Variable(initial)
+    with tf.variable_scope("", reuse=tf.AUTO_REUSE):
+        initial = tf.constant(0.1, shape=shape, name=name)
+        return tf.Variable(initial)
 
-def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.20):
+def conv(input, filter, name, pad="SAME", dilation=0, dropR=0.3):
     f = weight_variable(filter, name+"f1")
 
     if not dilation > 0:
@@ -24,8 +26,9 @@ def conv(input, filter, name, pad="SAME", dilation=0, leakyR=False, dropR=0.20):
     batch_norm = tf.contrib.layers.batch_norm(conv_bias)
     
     relu = tf.nn.relu(batch_norm)
-    if leakyR:
-        relu = tf.nn.leaky_relu(batch_norm,alpha=0.2,name=None)
+    
+    #if leakyR:
+    #relu = tf.nn.leaky_relu(batch_norm,alpha=0.2,name=None)
 
     #drop = tf.nn.dropout(relu, dropR)
 

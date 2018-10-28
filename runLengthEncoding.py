@@ -11,20 +11,21 @@ import csv
 import tensorflow as tf
 import os
 import matplotlib as mpl
-mpl.use('TkAgg')
+#mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 
 plt.style.use('seaborn-white')
 
-dataPath = "../data/TGS/images/"
 def runLenEncodeTestSet(sess, config, data, graph):
     
     x_valid = []
     y_valid = []
     x_preds = []
     y_preds = []
+    
+    print("loading data...")
 
-    for validationData in data.getNextBatchValidation(config["batchSize"], data.config["validationSize"]):
+    for validationData in data.getNextBatchValidation(config["batchSize"], 60):# data.config["validationSize"]):
 
         feed_dict={
             graph["imagePlaceholder"]: np.expand_dims(validationData[1], axis=3) if data.config["imageChannels"] == 1 else validationData[1],
@@ -32,10 +33,10 @@ def runLenEncodeTestSet(sess, config, data, graph):
         }
 
         x = graph["softmaxOut"].eval(feed_dict=feed_dict)
-        x_preds.append(x.squeeze()[:,:,1])
+        x_preds.append(x[0,:,:,1].squeeze())
 
-        x_valid.append(validationData[1].squeeze())
-        y_valid.append(validationData[0].squeeze())
+        x_valid.append(validationData[1][0].squeeze())
+        y_valid.append(validationData[0][0].squeeze())
 
     
     x_valid = np.array(x_valid)
@@ -48,9 +49,9 @@ def runLenEncodeTestSet(sess, config, data, graph):
     #thresholdMask = (x_preds > 0.663)
     #print("Thresholdmask: ", thresholdMask.shape)
     #sanityCheck(x_valid[thresholdMask], y_valid[thresholdMask], x_preds[thresholdMask])
-    sanityCheck(x_valid, y_valid, x_preds)
+    #sanityCheck(x_valid, y_valid, x_preds)
 
-    #thresholdOpt(x_preds, y_valid)
+    thresholdOpt(x_preds, y_valid)
 
     # with open("TGSCompetitionKaggleSegNet011.csv", "w") as csvFile:
     #     rleWriter = csv.writer(csvFile)
@@ -141,7 +142,7 @@ def RLenc(img, order='F', format=True):
         return runs
 
 def sanityCheck(x_valid, y_valid, preds_valid):
-    
+    print("Sanity Check")
     # display ground-truth
     max_images = 60
     grid_width = 15
@@ -151,11 +152,13 @@ def sanityCheck(x_valid, y_valid, preds_valid):
         img = (x_valid[idx] * 255).astype(np.uint8)
         mask = (y_valid[idx]  * 255).astype(np.uint8)
         ax = axs[int(idx / grid_width), idx % grid_width]
-        ax.imshow(img, cmap="Greys")
+        #ax.imshow(img, cmap="Greys")
         ax.imshow(mask, alpha=0.6, cmap="Greens")
         #ax.imshow(pred, alpha=0.6, cmap="OrRd")
         ax.set_yticklabels([])
         ax.set_xticklabels([])
+        
+  
     plt.suptitle("Green: salt")
     plt.show()
     
@@ -168,11 +171,13 @@ def sanityCheck(x_valid, y_valid, preds_valid):
         img = (x_valid[idx] * 255).astype(np.uint8)
         pred = (preds_valid[idx] * 255).astype(np.uint8)
         ax = axs[int(idx / grid_width), idx % grid_width]
-        ax.imshow(img, cmap="Greys")
+        #ax.imshow(img, cmap="Greys")
         #ax.imshow(mask, alpha=0.6, cmap="Greens")
         ax.imshow(pred, alpha=0.6, cmap="OrRd")
         ax.set_yticklabels([])
         ax.set_xticklabels([])
+        
+        
     plt.suptitle("Red: prediction")
     plt.show()
 

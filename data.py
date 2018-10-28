@@ -44,25 +44,48 @@ class Data:
 
         if not self.config["serializedObject"]:
             
-            # sort data because os.listdir selects files in arbitrary order
-            trainDataFiles = os.listdir(self.pathImages["train"])
-            trainLabelDataFiles = os.listdir(self.pathImages["trainLabel"])
-            trainDataFiles.sort()
-            trainLabelDataFiles.sort()
-            
-            
-            trainElements = int(self.config["trainSize"]*self.config["size"])
-            testElements = int(self.config["testSize"]*self.config["size"])
+            if self.config["name"] == "Seagrass":       
+                jsonData = json.load(open(self.config["path"]+"train.json"))
+                trainData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                labelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
 
-            self.imageData = {
-                "train": trainDataFiles[:trainElements],
-                "trainLabel": trainLabelDataFiles[:trainElements],
-                "test": trainDataFiles[trainElements:trainElements+testElements],
-                "testLabel": trainLabelDataFiles[trainElements:trainElements+testElements],
-                "validation": trainDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
-                "validationLabel": trainLabelDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
-            }
+                jsonData = json.load(open(self.config["path"]+"test.json"))
+                testData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                testLabelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
 
+                jsonData = json.load(open(self.config["path"]+"validate.json"))
+                validateData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                validateLabelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
+                
+                self.imageData = {
+                    "train": list(filter(lambda i:i != None, trainData)),
+                    "trainLabel": list(filter(lambda i:i != None, labelData)),
+                    "test": list(filter(lambda i:i != None, testData)),
+                    "testLabel": list(filter(lambda i:i != None, testLabelData)),
+                    "validation": list(filter(lambda i:i != None, validateData)),
+                    "validationLabel": list(filter(lambda i:i != None, validateLabelData))
+                }
+            else:
+                # sort data because os.listdir selects files in arbitrary order
+                trainDataFiles = os.listdir(self.pathImages["train"])
+                trainLabelDataFiles = os.listdir(self.pathImages["trainLabel"])
+                trainDataFiles.sort()
+                trainLabelDataFiles.sort()
+
+
+                trainElements = int(self.config["trainSize"]*self.config["size"])
+                testElements = int(self.config["testSize"]*self.config["size"])
+
+                self.imageData = {
+                    "train": trainDataFiles[:trainElements],
+                    "trainLabel": trainLabelDataFiles[:trainElements],
+                    "test": trainDataFiles[trainElements:trainElements+testElements],
+                    "testLabel": trainLabelDataFiles[trainElements:trainElements+testElements],
+                    "validation": trainDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
+                    "validationLabel": trainLabelDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
+                }
+
+                
             self.config["trainSize"] = len(self.imageData["train"])
             self.config["testSize"] = len(self.imageData["test"])
             self.config["validationSize"] = len(self.imageData["validation"])
@@ -221,9 +244,16 @@ class Data:
         
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
+        # correct transformation errors of cv2
+        
+        if type == "trainLabel":
+            img[(img <= 127).all(-1)] = [0,0,0]
+            img[(img >= 128).all(-1)] = [255,255,255]
+        
         #print(self.pathImages[type]+imageName, img.mean())
         #display(Image.fromarray(img, "RGB"))
-
+        
+        
 
         if type in ["trainLabel", "testLabel", "validationLabel"]:
             
@@ -248,18 +278,19 @@ class Data:
     # int seed - needed in order to get a unison shuffle
     def getNextBatchTrain(self, bsize, randSeed):
         #batchCount = list(range(int(self.config["trainSize"]*(int(self.config["size"])/bsize))))
-        trainElements = list(range(int(self.config["trainSize"])))
+        trainElements = list(range(int(self.config["trainSize"]/bsize)))
         #batchCount = self.config["trainSize"]/bsize
         np.random.seed(randSeed)
         np.random.shuffle(trainElements)
         
         for x in trainElements:
             data = [[],[]]
-            #label
-            data[0].append(self.imageData.item().get("trainLabel")[x] if self.config["serializedObject"] else self.getImage(x, "trainLabel"))
-            #train
-            data[1].append(self.imageData.item().get("train")[x] if self.config["serializedObject"] else self.getImage(x, "train"))
-            
+            for b in range(bsize):
+                #label
+                data[0].append(self.imageData.item().get("trainLabel")[x+b] if self.config["serializedObject"] else self.getImage(x+b, "trainLabel"))
+                #train
+                data[1].append(self.imageData.item().get("train")[x+b] if self.config["serializedObject"] else self.getImage(x+b, "train"))
+
             yield np.asarray(data[0]), np.asarray(data[1])
 
     # returns a batch of test data
@@ -279,13 +310,13 @@ class Data:
     # int testsize - size of the to be returned test data
     def getNextBatchTest(self, bsize, testsize):
         # test is considered one batch
-        for x in range(testsize):
+        for x in range(int(testsize/bsize)):
             data = [[],[]]
             for i in range(bsize):
                 #label
-                data[0].append(self.imageData.item().get("testLabel")[x] if self.config["serializedObject"] else self.getImage(x+i, "testLabel"))
+                data[0].append(self.imageData.item().get("testLabel")[x+i] if self.config["serializedObject"] else self.getImage(x+i, "testLabel"))
                 #train
-                data[1].append(self.imageData.item().get("test")[x] if self.config["serializedObject"] else self.getImage(x+i, "test"))
+                data[1].append(self.imageData.item().get("test")[x+i] if self.config["serializedObject"] else self.getImage(x+i, "test"))
 
             yield np.asarray(data[0]), np.asarray(data[1])
 
@@ -304,12 +335,12 @@ class Data:
     # returns a batch of validation data
     # int validation size - size of the to be returned validation data
     def getNextBatchValidation(self, bsize, validationSize):
-        for x in range(validationSize):
+        for x in range(int(validationSize/bsize)):
             data = [[],[]]
             for i in range(bsize):
                 #label
-                data[0].append(self.imageData.item().get("validationLabel")[x] if self.config["serializedObject"] else self.getImage(x+i, "validationLabel"))
+                data[0].append(self.imageData.item().get("validationLabel")[x+i] if self.config["serializedObject"] else self.getImage(x+i, "validationLabel"))
                 #train
-                data[1].append(self.imageData.item().get("validation")[x] if self.config["serializedObject"] else self.getImage(x+i, "validation"))
+                data[1].append(self.imageData.item().get("validation")[x+i] if self.config["serializedObject"] else self.getImage(x+i, "validation"))
 
             yield np.asarray(data[0]), np.asarray(data[1])

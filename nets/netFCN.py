@@ -1,5 +1,6 @@
 import tensorflow as tf
 import nnUtils as util
+import pixelDeconv
 
 STRIDE = 2
 K = 3
@@ -20,11 +21,17 @@ def net(image, classes):
 
     #decoding - deconvolution/transposing
 
-    deconv1 = util.deconv(conv4, tf.shape(conv3), [K,K,256,512], "dc1")    
-    deconv2 = util.deconv(deconv1, tf.shape(conv2), [K,K,256,256], "dc2")
-    deconv3 = util.deconv(deconv2, tf.shape(conv1), [K,K,128,256], "dc3") 
+    #deconv1 = util.deconv(conv4, tf.shape(conv3), [K,K,256,512], "dc1")    
+    #deconv2 = util.deconv(deconv1, tf.shape(conv2), [K,K,256,256], "dc2")
+    #deconv3 = util.deconv(deconv2, tf.shape(conv1), [K,K,128,256], "dc3") 
+    
+    deconv1 = pixelDeconv.pixel_dcl(conv4, 256, [K,K], "dc1")
+    deconv2 = pixelDeconv.pixel_dcl(deconv1, 256, [K,K], "dc2")
+    deconv3 = pixelDeconv.pixel_dcl(deconv2, 128, [K,K], "dc3")
+    
+    
     conv6 = util.conv(deconv3, [1,1,128,classes], "c6", pad="SAME")
 
     softmax = tf.nn.softmax(conv6)
 
-    return conv6, tf.argmax(softmax, axis=3)
+    return conv6, tf.argmax(softmax, axis=3), softmax

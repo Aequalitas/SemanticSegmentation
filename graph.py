@@ -23,9 +23,9 @@ def buildGraph(data, config):
 
     # class Weights for class imbalance
     # # create weights for this particular training image
-    # onehot_labels = tf.one_hot(labels, CLASSES)
-    # weights = onehot_labels * classWeights 
-    # weights = tf.reduce_sum(weights, 3)
+    onehot_labels = tf.one_hot(labels, data.config["classes"])
+    weights = onehot_labels * [0.1, 1]
+    weights = tf.reduce_sum(weights, 3)
 
 
     # Neural Network
@@ -33,30 +33,35 @@ def buildGraph(data, config):
 
     # Training
     # sparse because one pixel == one class and not multiple
-    loss = tf.reduce_mean(tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits))#, weights=weights)
+    #loss = tf.reduce_mean(tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits))
+    loss = tf.reduce_mean(tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits, weights=weights))
+    
     tf.summary.scalar("loss", loss)
 
     # optimizer
-    LR = tf.train.exponential_decay(LR, global_step, 10000, 0.96, staircase=True)
+    LR = tf.train.exponential_decay(LR, global_step, 2000, 0.96, staircase=True)
     tf.summary.scalar("learning_rate", LR)
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate=LR)
     optimizer = tf.train.AdamOptimizer(learning_rate=LR, name="AdamOpt")
     train_op = optimizer.minimize(loss, global_step=global_step)
     # grads = optimizer.compute_gradients(loss, var_list=tf.trainable_variables())
+    
     # train_op = optimizer.apply_gradients(grads)
 
     correct_prediction = tf.equal(tf.cast(predictionNet, tf.int32), labels)
     # frequency weighted accuracy
-    accuracy = tf.reduce_mean(tf.multiply(tf.cast(correct_prediction, tf.float32),1))
-
+    accuracy = tf.reduce_mean(tf.multiply(tf.cast(correct_prediction, tf.float32), weights))
+    
     #accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
+    
+    tf.metrics.accuracy(labels, predictionNet, weights)
+    
     tf.summary.scalar("accuracy", accuracy)
 
     saver = tf.train.Saver()
     merged = tf.summary.merge_all()
 
-    writer = tf.summary.FileWriter("../../logs/", graph=tf.get_default_graph())
+    writer = tf.summary.FileWriter("../logs/", graph=tf.get_default_graph())
 
     return {
         "logits":logits,
