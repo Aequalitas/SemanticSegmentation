@@ -133,12 +133,12 @@ class Data:
         labels = np.zeros((self.config["y"], self.config["x"]))
         classCount = np.zeros(self.config["classes"])
 
-        for i in range(int(self.config["size"]/PART)):
-            labels = getImg(i, "label").flatten().astype("int")
+        for i in range(int(self.config["trainSize"]/PART)):
+            labels = self.getImage(i, "trainLabel").flatten().astype("int")
             classCount[labels] += 1
 
             if i % 100 == 99:
-                print("Label image ",i+1,"/", ds["size"]/PART)
+                print("Label image ",i+1,"/", self.config["trainSize"]/PART)
         
         #choose class weights type
         #Frequency
@@ -171,7 +171,7 @@ class Data:
         print(classWeights.shape)
         print(classWeights)
 
-        np.save("classWeights"+weightType+str(self.config["x"])+str(self.config["y"])+self.config["name"], classWeights)
+        np.save("classWeights"+str(self.config["x"])+str(self.config["y"])+self.config["name"], classWeights)
     
     # get the whole dataset as an numpy object
     # bool balanced returns an train dataset that has even amount of every class set by the smallest class -> extreme balancing
@@ -227,10 +227,36 @@ class Data:
         return dataSet
     
     
+    def getImageTuple(self, imageFilename, labelFilename):
+        img = cv2.imread(self.pathImages["train"]+imageFilename.decode())
+        labelImg = cv2.imread(self.pathImages["trainLabel"]+labelFilename.decode())
+        if self.config["downsize"]:
+            img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
+            labelImg = cv2.resize(labelImg, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
+
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        labelImg = cv2.cvtColor(labelImg, cv2.COLOR_BGR2RGB)
+
+        # exterminate conversion errors by opencv
+        #labelImg[(labelImg <= 127)] = 0
+        #labelImg[(labelImg >= 128)] = 255
+        
+        labelImg = labelImg.astype(np.int32)
+
+        for rgbIdx, rgbV in enumerate(self.config["ClassToRGB"]):
+            labelImg[(labelImg == rgbV).all(-1)] = rgbIdx
+
+        img = ((img - img.mean()) / img.std()).astype(np.float32)
+
+        return img, labelImg[:,:,0]
+
+
+    
     # reads an image and pre-processes it for training/testing
     # int i - index for the image
     def getImage(self, i, type):
         imageName = self.imageData[type][i]        
+        
         if self.config["preProcessedPath"] != "":
             if type == "trainLabel":
                 return cv2.imread(self.pathImages[type]+imageName)[:,:,0]
@@ -246,9 +272,10 @@ class Data:
         
         # correct transformation errors of cv2
         
-        if type == "trainLabel":
-            img[(img <= 127).all(-1)] = [0,0,0]
-            img[(img >= 128).all(-1)] = [255,255,255]
+        #if type == "trainLabel":
+        #    img[(img <= 127).all(-1)] = [0,0,0]
+        #    img[(img >= 128).all(-1)] = [255,255,255]
+        
         
         #print(self.pathImages[type]+imageName, img.mean())
         #display(Image.fromarray(img, "RGB"))

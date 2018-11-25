@@ -1,5 +1,6 @@
 import tensorflow as tf 
 import importlib
+import numpy as np
 #from netFCN import net
 
 def buildGraph(data, config):
@@ -23,8 +24,9 @@ def buildGraph(data, config):
 
     # class Weights for class imbalance
     # # create weights for this particular training image
+    classWeights = np.load("classWeights"+str(data.config["x"])+str(data.config["y"])+data.config["name"]+".npy")
     onehot_labels = tf.one_hot(labels, data.config["classes"])
-    weights = onehot_labels * [0.1, 1]
+    weights = onehot_labels * (np.ones((data.config["classes"])) if classWeights is None else classWeights)
     weights = tf.reduce_sum(weights, 3)
 
 
@@ -50,11 +52,11 @@ def buildGraph(data, config):
 
     correct_prediction = tf.equal(tf.cast(predictionNet, tf.int32), labels)
     # frequency weighted accuracy
-    accuracy = tf.reduce_mean(tf.multiply(tf.cast(correct_prediction, tf.float32), weights))
+    #accuracy = tf.reduce_mean(tf.multiply(tf.cast(correct_prediction, tf.float32), weights))
     
-    #accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     
-    tf.metrics.accuracy(labels, predictionNet, weights)
+    #tf.metrics.accuracy(labels, predictionNet, weights)
     
     tf.summary.scalar("accuracy", accuracy)
 
@@ -62,7 +64,31 @@ def buildGraph(data, config):
     merged = tf.summary.merge_all()
 
     writer = tf.summary.FileWriter("../logs/", graph=tf.get_default_graph())
+    
+    labelData = None
+    imgData = None
+    itInit = None
+    if data.config["tfPrefetch"]:
+        with tf.device('/cpu:0'):
+            # tensorflow dataset for a more efficient input pipeline through threading
+            imageFilenames = tf.constant(data.imageData["train"])
+            labelsFileNames = tf.constant(data.imageData["trainLabel"])
 
+            dataset = tf.data.Dataset.from_tensor_slices((imageFilenames, labelsFileNames))
+            dataset = dataset.map(lambda filename, label: tf.py_func(
+                                          data.getImageTuple,
+                                          [filename, label],
+                                          [tf.float32, tf.int32]
+                                       ),  num_parallel_calls=config["threadCount"])
+
+
+            dataset = dataset.batch(config["batchSize"])
+            dataset = dataset.prefetch(1)
+            iterator = dataset.make_initializable_iterator()
+            imgData, labelData = iterator.get_next()
+            itInit = iterator.initializer
+
+    
     return {
         "logits":logits,
         "loss": loss,
@@ -71,6 +97,8 @@ def buildGraph(data, config):
         "softmaxOut": softmaxNet,
         "imagePlaceholder": image,
         "labelPlaceholder": labels,
+        "preFetchImageData":[imgData, labelData],
+        "itInit":itInit,
         "trainOp": train_op,
         "saver": saver,
         "logWriter": writer,

@@ -2,6 +2,7 @@ import tensorflow as tf
 import time 
 import numpy as np 
 import datetime
+import cv2 
 
 from predict import predict
 
@@ -17,24 +18,41 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
     feed_dict = {}
 
-    for batch in data.getNextBatchTrain(config["batchSize"], step*epoch):
+   
+    # reinitialize dataset for new epoch
+    if data.config["tfPrefetch"]:
+        sess.run(graph["itInit"])
         
+    for batchIdx in range(data.config["trainSize"]):
+
+        start = time.time()
 
         # images that create error which sets the loss to NaN
         faultyVals = list()
 
         if step not in faultyVals:
-            start = time.time()
-            _image = np.expand_dims(batch[1], axis=3) if data.config["imageChannels"] == 1 else batch[1]
-            _labels =  batch if data.config["imageChannels"] == 1 else batch[0]
 
+            if data.config["tfPrefetch"]:
+                try:
+                    imgData  = sess.run(graph["preFetchImageData"])
+                    _imageData = imgData[0]
+                    _labelData = imgData[1]
+                except tf.errors.OutOfRangeError:
+                    break
+            else:
+                batch = next(data.getNextBatchTrain(config["batchSize"], step*epoch))
+                _imageData = np.expand_dims(batch[1], axis=3) if data.config["imageChannels"] == 1 else batch[1]
+                _labelData = batch[0]
+
+            #print("IMAGEDATA:  ", _imageData.max(), _imageData.min(), _imageData.mean())
+            #print("LABELDATA:  ", _labelData.max(), _labelData.min(), _labelData.mean())
             feed_dict = {
-                graph["imagePlaceholder"] : _image,
-                graph["labelPlaceholder"] : _labels
+                graph["imagePlaceholder"] : _imageData,
+                graph["labelPlaceholder"] : _labelData
             }
-            
+
             graph["trainOp"].run(feed_dict=feed_dict)
-            
+
             end = time.time() 
             
             
@@ -61,14 +79,14 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
             # ends with \r to delete the older line so the new line can be printed
             print(status, end="\r")            
-            predict(sess, config, data, graph)
+            #predict(sess, config, data, graph)
             
-        if step % 2000 == 0:
-            if _loss > loss[-1]:
-                save_path = graph["saver"].save(sess, modelFileName)
-                print("\nModel saved in file: %s" % save_path)
-            else:
-                print("Loss did not advance therefore not saving model")
+        #if step % 1000 == 0:
+        #    if _loss > loss[-1]:
+        #        save_path = graph["saver"].save(sess, modelFileName)
+        #        print("\nModel saved in file: %s" % save_path)
+        #    else:
+        #        print("\nLoss did not advance therefore not saving model")
                 
         if step >= data.config["size"]:
             break
