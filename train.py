@@ -11,7 +11,8 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
     accuracySum = 0
     step = 1
-
+    trainSize = int(data.config["trainSize"]/config["batchSize"])
+    
     loss = []
     train_acc = []
     acc = []
@@ -23,7 +24,7 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
     if data.config["tfPrefetch"]:
         sess.run(graph["itInit"])
         
-    for batchIdx in range(data.config["trainSize"]):
+    for batchIdx in range(trainSize):
 
         start = time.time()
 
@@ -62,7 +63,7 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
         else:
             print("SKIPPED INVALID STEP: ", step)    
         
-        if step % 100 == 0:
+        if step % int(trainSize/10) == 0:
             summary, _loss, _train_acc = sess.run([graph["mergedLog"], graph["loss"], graph["accuracy"]], feed_dict=feed_dict)
             
             
@@ -72,14 +73,14 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
             graph["logWriter"].add_summary(summary, step)
 
 
-            status = "Epoch : "+str(epoch)+" || Step: "+str(step)+"/"+ str(data.config["trainSize"]/config["batchSize"])
+            status = "Epoch : "+str(epoch)+" || Step: "+str(step)+"/"+ str(trainSize)
             status += " || loss:"+str(round(np.mean(np.array(loss)), 5))+" || train_accuracy:"+ str(round(np.mean(np.array(train_acc)), 5))
-            status += "% || ETA: "+str(datetime.timedelta(seconds=((end-start)*((data.config["trainSize"]/config["batchSize"])-step))))
+            status += "% || ETA: "+str(datetime.timedelta(seconds=((end-start)*((trainSize)-step))))
             #status += "% || time 1 step with batch of "+str(config["batchSize"])+": "+str(round(end-start, 3))
 
             # ends with \r to delete the older line so the new line can be printed
             print(status, end="\r")            
-            #predict(sess, config, data, graph)
+            predict(sess, config, data, graph)
             
         #if step % 1000 == 0:
         #    if _loss > loss[-1]:
@@ -88,7 +89,7 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
         #    else:
         #        print("\nLoss did not advance therefore not saving model")
                 
-        if step >= data.config["size"]:
+        if step >= trainSize:
             break
 
         step+=1

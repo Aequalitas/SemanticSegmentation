@@ -82,7 +82,8 @@ def buildGraph(data, config):
                                        ),  num_parallel_calls=config["threadCount"])
 
 
-            dataset = dataset.batch(config["batchSize"])
+            dataset = dataset.shuffle(buffer_size=int(1000/config["batchSize"]))
+            dataset = dataset.batch(config["batchSize"], drop_remainder=True)
             dataset = dataset.prefetch(1)
             iterator = dataset.make_initializable_iterator()
             imgData, labelData = iterator.get_next()

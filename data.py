@@ -134,8 +134,9 @@ class Data:
         classCount = np.zeros(self.config["classes"])
 
         for i in range(int(self.config["trainSize"]/PART)):
-            labels = self.getImage(i, "trainLabel").flatten().astype("int")
-            classCount[labels] += 1
+            labels = np.bincount(self.getImage(i, "trainLabel").flatten().astype("int"), minlength=self.config["classes"])
+            if labels.shape[0] == self.config["classes"]:
+                classCount += labels
 
             if i % 100 == 99:
                 print("Label image ",i+1,"/", self.config["trainSize"]/PART)
@@ -238,8 +239,8 @@ class Data:
         labelImg = cv2.cvtColor(labelImg, cv2.COLOR_BGR2RGB)
 
         # exterminate conversion errors by opencv
-        #labelImg[(labelImg <= 127)] = 0
-        #labelImg[(labelImg >= 128)] = 255
+        labelImg[(labelImg <= 127)] = 0
+        labelImg[(labelImg >= 128)] = 255
         
         labelImg = labelImg.astype(np.int32)
 
@@ -272,9 +273,9 @@ class Data:
         
         # correct transformation errors of cv2
         
-        #if type == "trainLabel":
-        #    img[(img <= 127).all(-1)] = [0,0,0]
-        #    img[(img >= 128).all(-1)] = [255,255,255]
+        if type == "trainLabel":
+            img[(img <= 127).all(-1)] = [0,0,0]
+            img[(img >= 128).all(-1)] = [255,255,255]
         
         
         #print(self.pathImages[type]+imageName, img.mean())

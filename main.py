@@ -32,7 +32,7 @@ def deepSS(MODE, networkName, GPUNr="0"):
     data = Data("../data/"+config["dataset"]+"/configData"+config["dataset"]+".json")
     
     if MODE == "classWeights":
-        data.getClassWeights("Freq")
+        data.getClassWeights("1x")
     elif MODE == "serialize":
         print("Serializing dataset to ",data.config["path"]+data.config["fileName"])
 
@@ -69,6 +69,7 @@ def deepSS(MODE, networkName, GPUNr="0"):
                 for e in range(1, config["epochs"]+1):
                     doTrain(e, sess, graph, config, data, modelFileName)
                     predict(sess, config, data, graph)
+                    graph["saver"].save(sess, modelFileName)
                     
                 graph["saver"].save(sess, modelFileName)
                 
