@@ -41,7 +41,7 @@ def buildGraph(data, config):
     tf.summary.scalar("loss", loss)
 
     # optimizer
-    LR = tf.train.exponential_decay(LR, global_step, 2000, 0.96, staircase=True)
+    LR = tf.Variable(config["learningRate"], name="learningRate")
     tf.summary.scalar("learning_rate", LR)
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate=LR)
     optimizer = tf.train.AdamOptimizer(learning_rate=LR, name="AdamOpt")
@@ -71,23 +71,26 @@ def buildGraph(data, config):
     if data.config["tfPrefetch"]:
         with tf.device('/cpu:0'):
             # tensorflow dataset for a more efficient input pipeline through threading
-            imageFilenames = tf.constant(data.imageData["train"])
-            labelsFileNames = tf.constant(data.imageData["trainLabel"])
+            iterators = []
+            for _type in ["train", "validation", "test"]:
+                
+                print("Creating ", _type, " dataset...")
+                imageFilenames = tf.constant(data.imageData[_type])
+                labelsFileNames = tf.constant(data.imageData[_type+"Label"])
 
-            dataset = tf.data.Dataset.from_tensor_slices((imageFilenames, labelsFileNames))
-            dataset = dataset.map(lambda filename, label: tf.py_func(
-                                          data.getImageTuple,
-                                          [filename, label],
-                                          [tf.float32, tf.int32]
-                                       ),  num_parallel_calls=config["threadCount"])
+                dataset = tf.data.Dataset.from_tensor_slices((imageFilenames, labelsFileNames))
+                dataset = dataset.map(lambda filename, label: tf.py_func(
+                                              data.getImageTuple,
+                                              [filename, label],
+                                              [tf.float32, tf.int32]
+                                           ),  num_parallel_calls=config["threadCount"])
 
 
-            dataset = dataset.shuffle(buffer_size=int(1000/config["batchSize"]))
-            dataset = dataset.batch(config["batchSize"], drop_remainder=True)
-            dataset = dataset.prefetch(1)
-            iterator = dataset.make_initializable_iterator()
-            imgData, labelData = iterator.get_next()
-            itInit = iterator.initializer
+                dataset = dataset.shuffle(buffer_size=int(100/config["batchSize"]))
+                dataset = dataset.batch(config["batchSize"])
+                dataset = dataset.prefetch(5)
+                dataset = dataset.repeat(config["epochs"])
+                iterators.append(dataset.make_one_shot_iterator())
 
     
     return {
@@ -98,8 +101,7 @@ def buildGraph(data, config):
         "softmaxOut": softmaxNet,
         "imagePlaceholder": image,
         "labelPlaceholder": labels,
-        "preFetchImageData":[imgData, labelData],
-        "itInit":itInit,
+        "preFetchIterators": iterators,
         "trainOp": train_op,
         "saver": saver,
         "logWriter": writer,
