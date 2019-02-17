@@ -19,11 +19,6 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
     feed_dict = {}
 
-   
-    # reinitialize dataset for new epoch
-    if data.config["tfPrefetch"]:
-        sess.run(graph["itInit"])
-        
     for batchIdx in range(trainSize):
 
         start = time.time()
@@ -35,9 +30,14 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
             if data.config["tfPrefetch"]:
                 try:
-                    imgData  = sess.run(graph["preFetchImageData"])
-                    _imageData = imgData[0]
-                    _labelData = imgData[1]
+                    iterator = graph["preFetchIterators"][0]
+                    imgData = iterator.get_next()
+                    imgData  = sess.run(imgData)
+                    if imgData[0].shape[0] == config["batchSize"]:
+                        _imageData = imgData[0]
+                        _labelData = imgData[1]
+                    else:
+                        break
                 except tf.errors.OutOfRangeError:
                     break
             else:
@@ -81,14 +81,7 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
             # ends with \r to delete the older line so the new line can be printed
             print(status, end="\r")            
             predict(sess, config, data, graph)
-            
-        #if step % 1000 == 0:
-        #    if _loss > loss[-1]:
-        #        save_path = graph["saver"].save(sess, modelFileName)
-        #        print("\nModel saved in file: %s" % save_path)
-        #    else:
-        #        print("\nLoss did not advance therefore not saving model")
-                
+     
         if step >= trainSize:
             break
 
@@ -96,15 +89,22 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
     
 
     # validate trained model after one epoch
-    for validationData in data.getNextBatchValidation(config["batchSize"], data.config["validationSize"]):
+    iterator = graph["preFetchIterators"][1]
+    valSize = int(data.config["validationSize"]/config["batchSize"])
+    for r in range(valSize):
+
+        imgData = iterator.get_next()
+        imgData  = sess.run(imgData)
+        if imgData[0].shape[0] == config["batchSize"]:
 
         feed_dict={
-            graph["imagePlaceholder"]: np.expand_dims(validationData[1], axis=3) if data.config["imageChannels"] == 1 else validationData[1],
-            graph["labelPlaceholder"]: validationData if data.config["imageChannels"] == 1 else validationData[0]
+            graph["imagePlaceholder"]: np.expand_dims(imgData[0], axis=3) if data.config["imageChannels"] == 1 else imgData[0],
+            graph["labelPlaceholder"]: imgData if data.config["imageChannels"] == 1 else imgData[1]
         }
 
         _acc = 100*(graph["accuracy"].eval(feed_dict=feed_dict))    
         acc.append(_acc)
 
-    print("\nvalidation_accuracy: "+str(round(np.mean(np.array(acc)), 3)))
+    accuracy = round(np.mean(np.array(acc)), 3)
+    print("\nvalidation_accuracy: "+str(accuracy))
     return accuracySum
