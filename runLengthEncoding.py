@@ -25,20 +25,27 @@ def runLenEncodeTestSet(sess, config, data, graph):
     
     print("loading data...")
 
-    for validationData in data.getNextBatchValidation(config["batchSize"], 60):# data.config["validationSize"]):
+    iterator = graph["preFetchIterators"][2]
+    testSize = int(data.config["testSize"]/config["batchSize"])
+    for r in range(testSize):
 
-        feed_dict={
-            graph["imagePlaceholder"]: np.expand_dims(validationData[1], axis=3) if data.config["imageChannels"] == 1 else validationData[1],
-            graph["labelPlaceholder"]: validationData if data.config["imageChannels"] == 1 else validationData[0]
-        }
+        imgData = iterator.get_next()
+        imgData  = sess.run(imgData)
 
-        x = graph["softmaxOut"].eval(feed_dict=feed_dict)
-        x_preds.append(x[0,:,:,1].squeeze())
+        if imgData[0].shape[0] == config["batchSize"]:
+            feed_dict = {
+                graph["imagePlaceholder"]: imgData[0]
+            }
 
-        x_valid.append(validationData[1][0].squeeze())
-        y_valid.append(validationData[0][0].squeeze())
-
-    
+            pred = graph["softmaxOut"].eval(feed_dict=feed_dict)
+            pred = np.argmax(pred, axis=3)
+            labels = imgData[1]
+     
+            for b in range(config["batchSize"]):
+                x_preds.append(pred[b].squeeze())
+                x_valid.append(imgData[0][b].squeeze())
+                y_valid.append(imgData[1][b].squeeze())
+                
     x_valid = np.array(x_valid)
     y_valid = np.array(y_valid)
     x_preds = np.array(x_preds)
