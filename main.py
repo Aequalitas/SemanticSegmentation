@@ -64,14 +64,31 @@ def deepSS(MODE, networkName, GPUNr="0"):
             accuracySum = 0
 
             if MODE == "train":
-                print("Starting training...")
+                 print("Starting training...")
 
+                best_acc = 0
+                LRcounter = 0
                 for e in range(1, config["epochs"]+1):
-                    doTrain(e, sess, graph, config, data, modelFileName)
+                    curr_acc = doTrain(e, sess, graph, config, data, modelFileName)
                     predict(sess, config, data, graph)
-                    graph["saver"].save(sess, modelFileName)
                     
-                graph["saver"].save(sess, modelFileName)
+                    if best_acc < curr_acc:
+                        graph["saver"].save(sess, modelFileName)
+                        print("val acc of ", curr_acc, " better than ", best_acc)
+                        best_acc = curr_acc
+                        LRcounter = 0
+                    else:
+                        print("val acc of ", curr_acc, " NOT better than ", best_acc)
+                        if LRcounter >= 5:
+                            lr = graph["learningRate"].eval()
+                            graph["learningRate"] = tf.assign(graph["learningRate"], lr*0.1)
+                            print("Learning rate of ", lr ," is now decreased to ", lr * 0.1)
+                            LRcounter = 0
+                        
+                        LRcounter = LRcounter + 1
+                    
+                    if e % 5 == 0:
+                        evaluate(sess, config, data, graph)
                 
             elif MODE == "eval":
                 evaluate(sess, config, data, graph)
