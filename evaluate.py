@@ -8,6 +8,7 @@ from metricsSemSeg import pixel_accuracy, mean_accuracy, mean_IU, frequency_weig
 # simple test function, tests all images in testdata once
 def evaluate(sess, config, data, graph):
 
+    
     totalCorrect = 0
     totalCount = data.config["testSize"]*data.config["x"]*data.config["y"]*data.config["imageChannels"]
 
@@ -18,37 +19,33 @@ def evaluate(sess, config, data, graph):
 
     i = 0
 
-    for labelData, imgData in data.getNextBatchTest(config["batchSize"], data.config["testSize"]):
-        
-        # upper = config["batchSize"]*i
-        # lower = config["batchSize"]*(i-1)  
+    # validate trained model after one epoch
+    iterator = graph["preFetchIterators"][2]
+    testSize = int(data.config["testSize"]/config["batchSize"])
+    for r in range(testSize):
 
-        # if upper <= totalTestCount:
-        #     images = imgData[lower:upper]
-        #     labels = labelData[lower:upper]
+        imgData = iterator.get_next()
+        imgData  = sess.run(imgData)
 
-        #     totalCount += labels.size
-            
+        if imgData[0].shape[0] == config["batchSize"]:
             feed_dict = {
-                graph["imagePlaceholder"]: imgData
+                graph["imagePlaceholder"]: imgData[0]
             }
 
-            predClasses = sess.run(graph["prediction"], feed_dict=feed_dict)
-            
-            predClasses = np.squeeze(predClasses[0])
-            labelData = np.squeeze(labelData[0])
+            pred = sess.run(graph["prediction"], feed_dict=feed_dict)
+            labels = imgData[1]
+            for b in range(config["batchSize"]):
+                predClasses = np.squeeze(pred[b])
+                labelData = np.squeeze(labels[b])
 
-            totalCorrect += (predClasses == labelData).sum()
+                if i % 200 == 0:
+                    print("Image ", i, " evaluated...")
 
-            if i % 50 == 0:
-                print("Image ", i, " evaluated...")
+                totalPAcc = pixel_accuracy(predClasses, labelData) if totalPAcc == 0.0 else  (totalPAcc + pixel_accuracy(predClasses, labelData))/2
+                totalMAcc = mean_accuracy(predClasses, labelData) if totalMAcc == 0.0 else  (totalMAcc + mean_accuracy(predClasses, labelData))/2
+                totalMIU = mean_IU(predClasses, labelData) if totalMIU == 0.0 else  (totalMIU + mean_IU(predClasses, labelData))/2
+                totalFWIU = frequency_weighted_IU(predClasses, labelData) if totalFWIU == 0.0 else  (totalFWIU + frequency_weighted_IU(predClasses, labelData))/2
 
-            totalPAcc = pixel_accuracy(predClasses, labelData) if totalPAcc == 0.0 else  (totalPAcc + pixel_accuracy(predClasses, labelData))/2
-            totalMAcc = mean_accuracy(predClasses, labelData) if totalMAcc == 0.0 else  (totalMAcc + mean_accuracy(predClasses, labelData))/2
-            totalMIU = mean_IU(predClasses, labelData) if totalMIU == 0.0 else  (totalMIU + mean_IU(predClasses, labelData))/2
-            totalFWIU = frequency_weighted_IU(predClasses, labelData) if totalFWIU == 0.0 else  (totalFWIU + frequency_weighted_IU(predClasses, labelData))/2
+                i = i+1
 
-            i = i+1
-
-    print("Model Prediction: ", totalCorrect, "/", totalCount, " --> ", (totalCorrect/totalCount)*100,"% pixel correct")
     print("Pixel accuracy: ", totalPAcc ," || Mean accuracy: ", totalMAcc ," || Mean intersection union:", totalMIU ," || frequency weighted IU: ", totalFWIU)
