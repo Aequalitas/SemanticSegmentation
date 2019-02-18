@@ -19,6 +19,9 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
     feed_dict = {}
 
+    iterator = graph["preFetchIterators"][0]
+    nextImgData = iterator.get_next()
+        
     for batchIdx in range(trainSize):
 
         start = time.time()
@@ -30,9 +33,8 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
             if data.config["tfPrefetch"]:
                 try:
-                    iterator = graph["preFetchIterators"][0]
-                    imgData = iterator.get_next()
-                    imgData  = sess.run(imgData)
+                   
+                    imgData  = sess.run(nextImgData)
                     if imgData[0].shape[0] == config["batchSize"]:
                         _imageData = imgData[0]
                         _labelData = imgData[1]
@@ -90,11 +92,11 @@ def doTrain(epoch, sess, graph, config, data, modelFileName):
 
     # validate trained model after one epoch
     iterator = graph["preFetchIterators"][1]
+    nextImgData = iterator.get_next()
     valSize = int(data.config["validationSize"]/config["batchSize"])
+    
     for r in range(valSize):
-
-        imgData = iterator.get_next()
-        imgData  = sess.run(imgData)
+        imgData  = sess.run(nextImgData)
         if imgData[0].shape[0] == config["batchSize"]:
 
         feed_dict={
