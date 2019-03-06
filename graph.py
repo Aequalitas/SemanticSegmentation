@@ -1,79 +1,70 @@
+# Author: https://github.com/Aequalitas/
+# This file builds the static graph of Tensorflow. Means the Neural Network is built,
+# the loss function, Optimizer, logging functions and the dataset pipeline with tf.Data
+
 import tensorflow as tf 
 import importlib
 import numpy as np
-#from netFCN import net
 
-def buildGraph(data, config):
+def buildGraph(sess, data, config):
 
-    LR = config["learningRate"]
-    net = importlib.import_module("nets."+config["neuralNetwork"]).net
+        # Main Variables
+       
+        # create placeholder later to be filled
+        imageShape = [config["batchSize"], data.config["y"], data.config["x"], data.config["imageChannels"]]
+        image = tf.placeholder(tf.float32, shape=imageShape, name="input_image")
 
-    # REAL TENSORFLOW - low API
+        labelsShape = [config["batchSize"], data.config["y"], data.config["x"]]
+        labels = tf.placeholder(tf.int32, labelsShape, name="labels")
 
-    # Main Variables
-    # global step for decaying learning rate
-    global_step = tf.Variable(0, trainable=False)
+        # class Weights for class imbalance
+        # create weights for the particular batch
+        classWeights = [1.0, 1.0]
+        #try:
+        #    classWeights = np.load("classWeights"+str(data.config["x"])+str(data.config["y"])+data.config["name"]+".npy")
+        #    print("Classweights successfully loaded!")
+        #except:
+        #       print("No class weights to load!")
+        onehot_labels = tf.one_hot(labels, data.config["classes"])
+        weights = onehot_labels * classWeights 
+        weights = tf.reduce_sum(weights, 3)
 
-    # create placeholder later to be filled
-    imageShape = [config["batchSize"], data.config["y"], data.config["x"], data.config["imageChannels"]]
-    image = tf.placeholder(tf.float32, shape=imageShape, name="input_image")
+        # Neural Network is loaded from an extra file whose name is specified in the config file
+        net = importlib.import_module("nets."+config["neuralNetwork"]).net
+        logits, predictionNet, softmaxNet = net(image, data.config["classes"])
 
-    # has to be reshaped in case output resolution is smaller as in the unet
-    labelsShape = [config["batchSize"], data.config["y"], data.config["x"]]
-    labels = tf.placeholder(tf.int32, labelsShape, name="labels")
+        # Training part
+        # sparse because labels are given as in only the correct class has the value 1 and the rest are zeros
+        loss = tf.reduce_mean(tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits,weights=weights))
+        #loss = tf.reduce_mean(tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits))
+        tf.summary.scalar("loss", loss)
 
-    # class Weights for class imbalance
-    # # create weights for this particular training image
-    classWeights = np.load("classWeights"+str(data.config["x"])+str(data.config["y"])+data.config["name"]+".npy")
-    onehot_labels = tf.one_hot(labels, data.config["classes"])
-    weights = onehot_labels * (np.ones((data.config["classes"])) if classWeights is None else classWeights)
-    weights = tf.reduce_sum(weights, 3)
+        # Set a learn rate variable for later configuration
+        LR = tf.Variable(config["learningRate"], name="learningRate")
+        tf.summary.scalar("learning_rate", LR)
+        # Optimizer
+        optimizer = tf.train.AdamOptimizer(learning_rate=LR, name="AdamOpt")
+        train_op = optimizer.minimize(loss, global_step=tf.Variable(0, trainable=False))
+        
+        # metric variables for train pixel accuracy
+        correct_prediction = tf.equal(tf.cast(predictionNet, tf.int32), labels)
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        tf.summary.scalar("accuracy", accuracy)
 
+        # Tensorflow model saver
+        saver = tf.train.Saver()
+        merged = tf.summary.merge_all()
 
-    # Neural Network
-    logits, predictionNet, softmaxNet = net(image, data.config["classes"])
+        # logger 
+        writer = tf.summary.FileWriter("../logs/", graph=tf.get_default_graph())
 
-    # Training
-    # sparse because one pixel == one class and not multiple
-    #loss = tf.reduce_mean(tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits))
-    loss = tf.reduce_mean(tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits, weights=weights))
-    
-    tf.summary.scalar("loss", loss)
-
-    # optimizer
-    LR = tf.Variable(config["learningRate"], name="learningRate")
-    tf.summary.scalar("learning_rate", LR)
-    #optimizer = tf.train.GradientDescentOptimizer(learning_rate=LR)
-    optimizer = tf.train.AdamOptimizer(learning_rate=LR, name="AdamOpt")
-    train_op = optimizer.minimize(loss, global_step=global_step)
-    # grads = optimizer.compute_gradients(loss, var_list=tf.trainable_variables())
-    
-    # train_op = optimizer.apply_gradients(grads)
-
-    correct_prediction = tf.equal(tf.cast(predictionNet, tf.int32), labels)
-    # frequency weighted accuracy
-    #accuracy = tf.reduce_mean(tf.multiply(tf.cast(correct_prediction, tf.float32), weights))
-    
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    
-    #tf.metrics.accuracy(labels, predictionNet, weights)
-    
-    tf.summary.scalar("accuracy", accuracy)
-
-    saver = tf.train.Saver()
-    merged = tf.summary.merge_all()
-
-    writer = tf.summary.FileWriter("../logs/", graph=tf.get_default_graph())
-    
-    labelData = None
-    imgData = None
-    itInit = None
-    if data.config["tfPrefetch"]:
+        # Tensorflow dataset for a more efficient input pipeline by using threads
+        labelData = None
+        imgData = None
         with tf.device('/cpu:0'):
-            # tensorflow dataset for a more efficient input pipeline through threading
             iterators = []
             for _type in ["train", "validation", "test"]:
-                
+
                 print("Creating ", _type, " dataset...")
                 imageFilenames = tf.constant(data.imageData[_type])
                 labelsFileNames = tf.constant(data.imageData[_type+"Label"])
@@ -85,25 +76,28 @@ def buildGraph(data, config):
                                               [tf.float32, tf.int32]
                                            ),  num_parallel_calls=config["threadCount"])
 
-
-                dataset = dataset.shuffle(buffer_size=int(100/config["batchSize"]))
+                
+                # shuffle is done when collection the filenames in the init of Data()
+                #dataset = dataset.shuffle(buffer_size=int(100/config["batchSize"]))
                 dataset = dataset.batch(config["batchSize"])
-                dataset = dataset.prefetch(5)
+                dataset = dataset.prefetch(4)
                 dataset = dataset.repeat(config["epochs"])
                 iterators.append(dataset.make_one_shot_iterator())
 
-    
-    return {
-        "logits":logits,
-        "loss": loss,
-        "mergedLog": merged,
-        "prediction": predictionNet,
-        "softmaxOut": softmaxNet,
-        "imagePlaceholder": image,
-        "labelPlaceholder": labels,
-        "preFetchIterators": iterators,
-        "trainOp": train_op,
-        "saver": saver,
-        "logWriter": writer,
-        "accuracy": accuracy
-    }
+
+        return {
+            "logits":logits,
+            "loss": loss,
+            "mergedLog": merged,
+            "prediction": predictionNet,
+            "softmaxOut": softmaxNet,
+            "learningRate": LR,
+            "imagePlaceholder": image,
+            "labelPlaceholder": labels,
+            "trainOp": train_op,
+            "preFetchIterators": iterators,
+            "saver": saver,
+            "logWriter": writer,
+            "accuracy": accuracy
+        }
+
