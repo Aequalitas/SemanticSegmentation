@@ -1,27 +1,22 @@
-# dataset provider for classifications
+# Author: https://github.com/Aequalitas
+# This class provides some utility functions to work with a dataset
 
 import os 
 import cv2
 import numpy as np
 from PIL import Image
+import tensorflow as tf
+
 import sys 
+import random
 import json
 from time import sleep
-from IPython.display import display 
-
 
 class Data:
 
-    #self.config = None
-    
-    # path to the training and test images
-    #self.pathImages = None
-    # actual train and test data or file names of these
-    # when serialized = false
-    #self.imageData = None
-    
-    # loads the all file names or the serialized numpy object
+    # loads all the in the dataset config file specified file names or the serialized numpy object
     def loadDataset(self):
+        # set dictonary for the different dataset splits and set initially the dataset path
         self.pathImages = {
             "train": self.config["path"],
             "trainLabel": self.config["path"],
@@ -30,70 +25,58 @@ class Data:
             "validation": self.config["path"],
             "validationLabel": self.config["path"]
         }
-
-        if self.config["preProcessedPath"] != "":
-            self.pathImages["train"] += self.config["preProcessedPath"]+self.config["images"]
-            self.pathImages["trainLabel"] += self.config["preProcessedPath"]+self.config["labels"]
-        else:
-            self.pathImages["train"] += self.config["images"]
-            self.pathImages["trainLabel"] += self.config["labels"]
-            self.pathImages["test"] += self.config["images"]
-            self.pathImages["testLabel"] += self.config["labels"]
-            self.pathImages["validation"] += self.config["images"]
-            self.pathImages["validationLabel"] += self.config["labels"]
-
+        
+        # append the given train or label path
+        self.pathImages["train"] += self.config["images"]
+        self.pathImages["trainLabel"] += self.config["labels"]
+        self.pathImages["test"] += self.config["images"]
+        self.pathImages["testLabel"] += self.config["labels"]
+        self.pathImages["validation"] += self.config["images"]
+        self.pathImages["validationLabel"] += self.config["labels"]
+        
         if not self.config["serializedObject"]:
+            # with os.listdir() read the file names in the directories
+            trainDataFiles = os.listdir(self.pathImages["train"])
+            trainLabelDataFiles = os.listdir(self.pathImages["trainLabel"])
             
-            if self.config["name"] == "Seagrass":       
-                jsonData = json.load(open(self.config["path"]+"train.json"))
-                trainData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                labelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-
-                jsonData = json.load(open(self.config["path"]+"test.json"))
-                testData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                testLabelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-
-                jsonData = json.load(open(self.config["path"]+"validate.json"))
-                validateData = list(map(lambda i:os.path.basename(i["image"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                validateLabelData = list(map(lambda i:os.path.basename(i["ground-truth"]) if i["depth"] <= float(self.config["depth"]) else None, jsonData))
-                
-                self.imageData = {
-                    "train": list(filter(lambda i:i != None, trainData)),
-                    "trainLabel": list(filter(lambda i:i != None, labelData)),
-                    "test": list(filter(lambda i:i != None, testData)),
-                    "testLabel": list(filter(lambda i:i != None, testLabelData)),
-                    "validation": list(filter(lambda i:i != None, validateData)),
-                    "validationLabel": list(filter(lambda i:i != None, validateLabelData))
-                }
-            else:
-                # sort data because os.listdir selects files in arbitrary order
-                trainDataFiles = os.listdir(self.pathImages["train"])
-                trainLabelDataFiles = os.listdir(self.pathImages["trainLabel"])
-                trainDataFiles.sort()
-                trainLabelDataFiles.sort()
-
-
-                trainElements = int(self.config["trainSize"]*self.config["size"])
-                testElements = int(self.config["testSize"]*self.config["size"])
-
-                self.imageData = {
-                    "train": trainDataFiles[:trainElements],
-                    "trainLabel": trainLabelDataFiles[:trainElements],
-                    "test": trainDataFiles[trainElements:trainElements+testElements],
-                    "testLabel": trainLabelDataFiles[trainElements:trainElements+testElements],
-                    "validation": trainDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
-                    "validationLabel": trainLabelDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
-                }
-
-                
+            # sort file names because os.listdir does extract them in arbitrary order
+            trainDataFiles.sort()
+            trainLabelDataFiles.sort()
+            
+            # count the amount of the file names that also sets the training size
+            trainElements = int(self.config["trainSize"]*len(trainDataFiles))
+            testElements = int(self.config["testSize"]*len(trainDataFiles))
+            
+            # remove n elements in order for a complete last batch with axis = 0 => batchSize
+            trainElements -= trainElements % self.config["batchSize"]
+            testElements -= testElements % self.config["batchSize"]
+            
+            # shuffle the file names for creating a balanced training experience
+            # same random seed to be able to compare results with other training sessions
+            # here the sum of chars in the dataset name. Calc function taken from: https://codereview.stackexchange.com/q/13863
+            random.seed(sum(ord(c) - 64 for c in self.config["name"]))
+            randomIndices = np.arange(len(trainDataFiles), dtype=np.int32)
+            random.shuffle(randomIndices)
+            trainDataFiles = np.take(trainDataFiles, randomIndices)
+            trainLabelDataFiles = np.take(trainDataLabelFiles, randomIndices)
+            
+            # set the given dataset split whith their element by simple numpy indexing
+            self.imageData = {
+                "train": trainDataFiles[:trainElements],
+                "trainLabel": trainLabelDataFiles[:trainElements],
+                "test": trainDataFiles[trainElements:trainElements+testElements],
+                "testLabel": trainLabelDataFiles[trainElements:trainElements+testElements],
+                "validation": trainDataFiles[trainElements+testElements if testElements > 0 else trainElements:],
+                "validationLabel": trainLabelDataFiles[trainElements+testElements if testElements > 0 else trainElements:]
+            }
+            # set the dataset splits sizes
             self.config["trainSize"] = len(self.imageData["train"])
             self.config["testSize"] = len(self.imageData["test"])
             self.config["validationSize"] = len(self.imageData["validation"])
-
             print("trainSize: ", self.config["trainSize"], " Testsize: ", self.config["testSize"], "Validationsize: ", self.config["validationSize"])
 
+        # else read serialized numpy object
         else:
-
             self.imageData = np.load(self.config["path"]+self.config["fileName"]+".npy")
             self.config["trainSize"] = len(self.imageData.item().get("train"))
             self.config["testSize"] = len(self.imageData.item().get("test"))
@@ -105,6 +88,7 @@ class Data:
     def __init__(self, configPath):
 
         try:
+            print(configPath)
             self.config = json.load(open(configPath))    
         except:
             raise "Wrong path for data config file given!"
@@ -121,26 +105,27 @@ class Data:
     # [trainData, labelData] dataSet - if there is another dataset than self.getDataset() eg. balanced
     def getClassWeights(self, weightType, dataSet=None):
    
-        if not weightType in ["Freq", "MedianFreq", "1x", "2x", "division"]:
-            raise ValueError("Wrong weights calc type given! Valid arguments are [Freq, MedianFreq, 1x, 2x, division]")
-
+        if not weightType in ["Freq", "MedianFreq", "1x", "2x", "division", "relativeToMin", "quantile"]:
+            raise ValueError("Wrong weights calc type given! Valid arguments are [Freq, MedianFreq, 1x, 2x, division, relativeToMin, quantile]")
 
         # get class weights because of imbalanced dataset (e.g. a lot of road and buildings)
-        print("Calculate class weights...")
+        print("Calculate class ",weightType ," weights...")
 
-        # count all labels
+        # only calculate the weights from a specific split of the dataset. For performance reasons
+        # PART = 1 would be the total dataset
         PART = 10
-        labels = np.zeros((self.config["y"], self.config["x"]))
         classCount = np.zeros(self.config["classes"])
-
+        # count all the classes in every given mask image
         for i in range(int(self.config["trainSize"]/PART)):
-            labels = np.bincount(self.getImage(i, "trainLabel").flatten().astype("int"), minlength=self.config["classes"])
-            if labels.shape[0] == self.config["classes"]:
-                classCount += labels
+            labelImg = self.getImage(i, "trainLabel").flatten()
+            labelClassCount = np.bincount(labelImg, minlength=self.config["classes"])
+            classCount += labelClassCount
+            
+            if i % int(1000/PART) == 0:
+                print("Label image ",i,"/", self.config["trainSize"]/PART)
 
-            if i % 100 == 99:
-                print("Label image ",i+1,"/", self.config["trainSize"]/PART)
-        
+        print("Class count: ", classCount.shape, classCount)
+
         #choose class weights type
         #Frequency
         if weightType == "Freq":
@@ -160,23 +145,34 @@ class Data:
             #divide with minimum
             classWeights[classWeights == 1] = 999999
             classWeights /= classWeights.min()
-            classWeights[classWeights == classWeights.max()] = 1
+        # all weights are relative to the smallest class which is assigned the 1.0. Minimal assigned value is 0.1                     
+        elif weightType == "relativeToMin":
+            classWeights = classCount.min() / classCount
+            print("Class weights: ", classWeights.shape, classWeights)
+            classWeights[(classWeights < 0.1)] *= 10 
+        # using the quantile transformer of sklearn all the weights are distributed in 0-0.9999. Minimal assigned value is 0.1
+        elif weightType == "quantile":
+            from sklearn.preprocessing.data import QuantileTransformer
+            _scaler = QuantileTransformer()
+            classCount = np.expand_dims(classCount, axis=1)
+            classWeights = _scaler.fit_transform(classCount)
+            classWeights = np.around(classWeights, decimals=4)
+            classWeights = np.squeeze(classWeights)
+            classWeights = 1 - classWeights
+            classWeights[(classWeights < 0.1)] = 0.1
+            
         else:
-            raise ValueError("Wrong weights calc type given! Valid arguments are [Freq, MedianFreq, 1x, 2x, division]")
+            raise ValueError("Wrong weights calc type given! Valid arguments are [Freq, MedianFreq, 1x, 2x, division, relativeToMin, quantile]")
 
         # eliminate inf values
         classWeights[(classWeights == np.inf)] = 1
-        
-        print(classCount.shape)
-        print(classCount)
-        print(classWeights.shape)
-        print(classWeights)
-
+        print("Class weights: ", classWeights.shape, classWeights)
         np.save("classWeights"+str(self.config["x"])+str(self.config["y"])+self.config["name"], classWeights)
     
-    # get the whole dataset as an numpy object
+    # get the whole dataset as an numpy object for the "serialize" MODE
     # bool balanced returns an train dataset that has even amount of every class set by the smallest class -> extreme balancing
-    def getDataset(self, balanced=False, flipH=False):
+    # bool flipV whether the dataset is doubled by flipping all images vertically
+    def getDataset(self, balanced=False, flipV=False):
         
         dataSet = {
             "train": None,
@@ -198,9 +194,7 @@ class Data:
             smallestClassCount = np.bincount(classes).min()
             smallestClass = np.argmin(np.bincount(classes))
             print("Smallest Class with ", smallestClassCount, " elements is class ", smallestClass, " from ", np.bincount(np.argmax(dataSet["label"], axis=1)))
-            
-            classIndices = [[0] * 10000 for i in range(self.config["classes"])]#np.array((self.config["classes"], self.config["size"]))
-
+            classIndices = [[0] * 10000 for i in range(self.config["classes"])]
             for classNr in range(self.config["classes"]):
                 classIndices[classNr] = [el[:smallestClassCount] for el in np.where((classes == classNr))]
 
@@ -219,156 +213,73 @@ class Data:
             dataSet["train"] = dataSet["train"][classIndices]
             dataSet["trainLabel"] = dataSet["trainLabel"][classIndices]
         
-        # flip images horizontally
-        if flipH:
+        # flip images vertically
+        if flipV:
             for set in ["train", "test", "validation"]:
                 dataSet[set] = np.append(dataSet[set], [np.fliplr(x) for x in dataSet[set]], axis=0)
                 dataSet[set+"Label"] = np.append(dataSet[set+"Label"], [np.fliplr(x) for x in dataSet[set+"Label"]], axis=0)
 
         return dataSet
     
-    
+    # reads an image and pre-processes it for training/testing
+    # string imageFilename name(s) of the current train batch
+    # string labelFilename name(s) of the current label batch
     def getImageTuple(self, imageFilename, labelFilename):
+        
+        # with tensorflow
+
+        #imgPath = tf.string_join([self.pathImages["train"], imageFilename])
+        #imgString = tf.read_file(imgPath)
+        #img = tf.image.decode_jpeg(imgString, channels=3)
+
+        #labelImgPath = tf.string_join([self.pathImages["trainLabel"], labelFilename])
+        #labelImgString = tf.read_file(labelImgPath)
+        #labelImg = tf.image.decode_jpeg(labelImgString)
+
+        #if self.config["downsize"]:
+        #    img = tf.image.resize_images(img, [self.config["x"], self.config["y"]])
+        #    labelImg = tf.image.resize_images(labelImg, [self.config["x"], self.config["y"]])
+
+        # labels
+        #classesImg = tf.zeros([self.config["y"] * self.config["x"]], tf.int32)
+        # converting RGB values to their corresponding classes
+        #for rgbIdx, rgbV in enumerate(self.config["ClassToRGB"]):
+        #    rgbV = tf.constant(rgbV)
+        #    labelImg = tf.cast(tf.reshape(labelImg, [self.config["y"] * self.config["x"]]), tf.int32)
+            # way too slow, not comparable to numpys img[(img == rgbV).all(-1)] = rgbIdx
+        #    label = tf.map_fn(lambda label: rgbIdx if tf.equal(label, rgbV) is not False else 0, labelImg)
+            ##label = tf.SparseTensor(indices=tf.where(label), values=[rgbIdx], dense_shape=[data.config["x"] * data.config["y"]])
+            ##label = tf.parse.to_dense(label)
+        #    classesImg = tf.add(classesImg, label)
+
+        #classesImg = tf.reshape(classesImg, [self.config["y"], self.config["x"]])
+
+        #img = tf.image.per_image_standardization(img)
+        #img = tf.reshape(img, [self.config["y"], self.config["x"], self.config["imageChannels"]])
+
+        #return  img, classesImg
+
+        # with numpy and opencv
+
         img = cv2.imread(self.pathImages["train"]+imageFilename.decode())
         labelImg = cv2.imread(self.pathImages["trainLabel"]+labelFilename.decode())
-        if self.config["downsize"]:
-            img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
-            labelImg = cv2.resize(labelImg, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
-
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         labelImg = cv2.cvtColor(labelImg, cv2.COLOR_BGR2RGB)
-
-        # exterminate conversion errors by opencv
-        labelImg[(labelImg <= 127)] = 0
-        labelImg[(labelImg >= 128)] = 255
-        
-        labelImg = labelImg.astype(np.int32)
-
+        img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
+        if self.config["downsize"]: 
+            labelImg = cv2.resize(labelImg, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
+        # assure that there are no conversion errors in the TuSimple dataset
+        if self.config["name"] == "TuSimple":
+            labelImg[(labelImg  >= 128).all(-1)] = [255,255,255]
+            labelImg[(labelImg  <= 127).all(-1)] = [0,0,0]
+        # transform the RGB values of the mask to the class numbers according to the list set in the dataset config file
         for rgbIdx, rgbV in enumerate(self.config["ClassToRGB"]):
-            labelImg[(labelImg == rgbV).all(-1)] = rgbIdx
+                labelImg[(labelImg == rgbV).all(-1)] = rgbIdx
 
+        # assure that there are no RGB values left by assigning them the black class as in the zero
+        labelImg[(labelImg >= self.config["classes"])] = 0
+
+        # standardasize the train image for better training
         img = ((img - img.mean()) / img.std()).astype(np.float32)
 
-        return img, labelImg[:,:,0]
-
-
-    
-    # reads an image and pre-processes it for training/testing
-    # int i - index for the image
-    def getImage(self, i, type):
-        imageName = self.imageData[type][i]        
-        
-        if self.config["preProcessedPath"] != "":
-            if type == "trainLabel":
-                return cv2.imread(self.pathImages[type]+imageName)[:,:,0]
-            else:
-                return cv2.imread(self.pathImages[type]+imageName)
-
-        img = cv2.imread(self.pathImages[type]+imageName)
-        
-        if self.config["downsize"]:
-            img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
-        
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
-        # correct transformation errors of cv2
-        
-        if type == "trainLabel":
-            img[(img <= 127).all(-1)] = [0,0,0]
-            img[(img >= 128).all(-1)] = [255,255,255]
-        
-        
-        #print(self.pathImages[type]+imageName, img.mean())
-        #display(Image.fromarray(img, "RGB"))
-        
-        
-
-        if type in ["trainLabel", "testLabel", "validationLabel"]:
-            
-            for rgbIdx, rgbV in enumerate(self.config["ClassToRGB"]):
-                img[(img == rgbV).all(-1)] = rgbIdx
-            
-            
-            #print("Label: "+imageName+" ", img[:,:,0].max(), img[:,:,0].min(), img[:,:,0].mean())
-            return img[:,:,0]
-
-        elif type in ["train", "test", "validation"]:
-            try:
-                #  standarsize train values to an interval of [-1,1]
-                if img.std() != None :
-                    return (img - img.mean()) / img.std()
-            except:
-                print("NONE IMG")
-                return (img - img.mean()) / 1
-
-    # returns an iterator which provides on every call one batch
-    # int bsize - batch size to be returned
-    # int seed - needed in order to get a unison shuffle
-    def getNextBatchTrain(self, bsize, randSeed):
-        #batchCount = list(range(int(self.config["trainSize"]*(int(self.config["size"])/bsize))))
-        trainElements = list(range(int(self.config["trainSize"]/bsize)))
-        #batchCount = self.config["trainSize"]/bsize
-        np.random.seed(randSeed)
-        np.random.shuffle(trainElements)
-        
-        for x in trainElements:
-            data = [[],[]]
-            for b in range(bsize):
-                #label
-                data[0].append(self.imageData.item().get("trainLabel")[x+b] if self.config["serializedObject"] else self.getImage(x+b, "trainLabel"))
-                #train
-                data[1].append(self.imageData.item().get("train")[x+b] if self.config["serializedObject"] else self.getImage(x+b, "train"))
-
-            yield np.asarray(data[0]), np.asarray(data[1])
-
-    # returns a batch of test data
-    # int testsize - size of the to be returned test data
-    def getTestData(self, testsize):
-        # test is considered one batch
-        data = [[],[]]
-        for x in range(testSize):
-            #label
-            data[0].append(self.imageData.item().get("testLabel")[x] if self.config["serializedObject"] else self.getImage(x, "testLabel"))
-            #train
-            data[1].append(self.imageData.item().get("test")[x] if self.config["serializedObject"] else self.getImage(x, "test"))
-                
-        return np.asarray(data[0]), np.asarray(data[1])
-    
-    # returns a generator of test data
-    # int testsize - size of the to be returned test data
-    def getNextBatchTest(self, bsize, testsize):
-        # test is considered one batch
-        for x in range(int(testsize/bsize)):
-            data = [[],[]]
-            for i in range(bsize):
-                #label
-                data[0].append(self.imageData.item().get("testLabel")[x+i] if self.config["serializedObject"] else self.getImage(x+i, "testLabel"))
-                #train
-                data[1].append(self.imageData.item().get("test")[x+i] if self.config["serializedObject"] else self.getImage(x+i, "test"))
-
-            yield np.asarray(data[0]), np.asarray(data[1])
-
-    # returns a batch of validation data
-    # int validation size - size of the to be returned validation data
-    def getValidationData(self, validationSize):
-        data = [[],[]]
-        for x in range(validationSize):
-            #label
-            data[0].append(self.imageData.item().get("validationLabel")[x] if self.config["serializedObject"] else self.getImage(x, "validationLabel"))
-            #train
-            data[1].append(self.imageData.item().get("validation")[x] if self.config["serializedObject"] else self.getImage(x, "validation"))
-            
-        return np.asarray(data[0]), np.asarray(data[1])
-
-    # returns a batch of validation data
-    # int validation size - size of the to be returned validation data
-    def getNextBatchValidation(self, bsize, validationSize):
-        for x in range(int(validationSize/bsize)):
-            data = [[],[]]
-            for i in range(bsize):
-                #label
-                data[0].append(self.imageData.item().get("validationLabel")[x+i] if self.config["serializedObject"] else self.getImage(x+i, "validationLabel"))
-                #train
-                data[1].append(self.imageData.item().get("validation")[x+i] if self.config["serializedObject"] else self.getImage(x+i, "validation"))
-
-            yield np.asarray(data[0]), np.asarray(data[1])
+        return img, labelImg[:,:,0].astype(np.int32)
