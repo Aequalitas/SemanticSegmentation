@@ -76,9 +76,24 @@ def buildGraph(sess, data, config):
                                               [tf.float32, tf.int32]
                                            ),  num_parallel_calls=config["threadCount"])
 
+                if (_type == "train") | (_type == "validation"):
+                    # data augmentation
+                    datasetFlippedV = dataset.map(lambda trainImage, labelImage:
+                                                 (tf.reverse(trainImage, axis=[1]), tf.reverse(labelImage, axis=[1]))
+                                               , num_parallel_calls=config["threadCount"])
+                    dataset = dataset.concatenate(datasetFlippedV)
+
+                    #datasetFlippedH = dataset.map(lambda trainImage, labelImage:
+                    #                              tf.reverse(trainImage, axis=2), tf.reverse(labelImage, axis=2)
+                    #                           , num_parallel_calls=config["threadCount"])
+
+                    dataset = dataset.concatenate(datasetFlippedV)
+                    data.config[_type+"Size"] *= 2
+                    print("Dataset flipped vertically new ", _type, "Size: ", data.config[_type+"Size"])
+
+                if _type == "train":
+                    dataset = dataset.shuffle(buffer_size=int(100/config["batchSize"]))
                 
-                # shuffle is done when collection the filenames in the init of Data()
-                #dataset = dataset.shuffle(buffer_size=int(100/config["batchSize"]))
                 dataset = dataset.batch(config["batchSize"])
                 dataset = dataset.prefetch(4)
                 dataset = dataset.repeat(config["epochs"])
