@@ -268,8 +268,8 @@ class Data:
         img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
         if self.config["downsize"]: 
             labelImg = cv2.resize(labelImg, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
-        # assure that there are no conversion errors in the TuSimple dataset
-        if self.config["name"] == "TuSimple":
+        # assure that there are no conversion errors in binary datasets
+        if self.config["classes"] <= 2:
             labelImg[(labelImg  >= 128).all(-1)] = [255,255,255]
             labelImg[(labelImg  <= 127).all(-1)] = [0,0,0]
         # transform the RGB values of the mask to the class numbers according to the list set in the dataset config file
