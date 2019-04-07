@@ -60,27 +60,6 @@ def runLenEncodeTestSet(sess, config, data, graph):
 
     thresholdOpt(x_preds, y_valid)
 
-    # with open("TGSCompetitionKaggleSegNet011.csv", "w") as csvFile:
-    #     rleWriter = csv.writer(csvFile)
-    #     rleWriter.writerow(["id","rle_mask"])
-
-    #     for idx, imageName in enumerate(os.listdir(dataPath)):
-    #         img = cv2.imread(dataPath+imageName)  
-    #         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #         imgRes = cv2.resize(img, (data.config["x"], data.config["y"]), interpolation=cv2.INTER_NEAREST)
-            
-    #         imgRes = (imgRes - imgRes.mean()) / imgRes.std()
-    #         feed_dict = {
-    #             graph["imagePlaceholder"]: np.expand_dims(imgRes, axis=0)
-    #         }
-
-    #         segImage = sess.run(graph["softmaxOut"], feed_dict=feed_dict).squeeze()
-            
-    #         # only encode salt propabilities above threshold
-    #         rleWriter.writerow([imageName[:10], RLenc(np.round(segImage[:,:,1] > 0.673))]) 
-
-    #         if idx % 1000 == 999:
-    #             print("Image ",idx+1," processed...")
 
 def runLenEncode(segImage):
 
