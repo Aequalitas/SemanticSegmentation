@@ -31,9 +31,11 @@ def predict(sess, config, data, graph):
     predImg = np.zeros((data.config["x"]*data.config["y"],3))
 
 
-    for idx, p in enumerate(predClasses):
-        predImg[idx] = data.config["ClassToRGB"][p]
+    #for idx, p in enumerate(predClasses):
+    #    predImg[idx] = data.config["ClassToRGB"][p]
 
+    for cl in range(config["classes"]):
+        predImg[(predClasses == cl)] = data.config["ClassToRGB"][cl]
    
     predImg = predImg.reshape((data.config["y"], data.config["x"], data.config["imageChannels"])).astype("uint8")
     #print(predClasses)
