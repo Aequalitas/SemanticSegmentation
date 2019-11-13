@@ -22,6 +22,7 @@ from graph import buildGraph
 from train import doTrain
 from predict import predict
 from evaluate import evaluate
+from sanityCheck import sanityCheckMain
 #from demo import demo
 
 def deepSS(MODE, networkName):
@@ -74,6 +75,7 @@ def deepSS(MODE, networkName):
                 for e in range(1, config["epochs"]+1):
                     curr_acc = doTrain(e, sess, graph, config, data, modelFileName)
                     predict(sess, config, data, graph)
+                    evaluate(sess, config, data, graph)
                     # if validation accuracy is not increasing after 4 times then decrease the learning rate by multiple of 0.1
                     if best_acc < curr_acc:
                         print("val acc of ", curr_acc, " better than ", best_acc)
@@ -101,6 +103,9 @@ def deepSS(MODE, networkName):
            
             elif MODE == "demo":
                 demo(sess, config, data, graph)
+            
+            elif MODE == "sanityCheck":
+                sanityCheckMain(sess, config, data, graph, num_display_images=20)
                 
             elif MODE == "profile":
                 import importlib
@@ -113,7 +118,31 @@ def deepSS(MODE, networkName):
                 opts = tf.profiler.ProfileOptionBuilder.trainable_variables_parameter()    
                 params = tf.profiler.profile(sess.graph, run_meta=run_meta, cmd='op', options=opts)
                 print("{:,} FLOPS --- {:,} total parameters".format(flops.total_float_ops, params.total_parameters))
+            
+            elif MODE == "optimize":
+                converter = tf.lite.TFLiteConverter.from_session(sess, graph["imagePlaceholder"], graph["logits"])
+                converter.optimizations = [tf.lite.Optimize.OPTIMIZE_FOR_SIZE]
+                
+                print("Converting model...")
+                tflite_model = converter.convert()
+                open(MODELFILE+".tflite", "wb").write(tflite_model)
+                print("Model converting finished!")
+            
+            elif MODE == "optimize_quant":
+                converter = tf.lite.TFLiteConverter.from_session(sess, graph["imagePlaceholder"], graph["logits"])
+                converter.optimizations = [tf.lite.Optimize.OPTIMIZE_FOR_SIZE]
+                converter.allow_custom_ops = True
+                converter.representative_dataset = representative_dataset_gen
 
+                # full quanitzation for coral edge TPU compatibility
+                converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+                converter.inference_input_type = tf.uint8
+                converter.inference_output_type = tf.uint8
 
+                print("Converting model...")
+                quant_tflite_model = converter.convert()
+                open(MODELFILE+".quant.tflite", "wb").write(quant_tflite_model)
+                print("Model converting finished!")
+    
 
 
