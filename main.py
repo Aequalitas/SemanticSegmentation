@@ -22,7 +22,7 @@ from graph import buildGraph
 from train import doTrain
 from predict import predict
 from evaluate import evaluate
-from demo import demo
+#from demo import demo
 
 def deepSS(MODE, networkName):
 
@@ -30,7 +30,7 @@ def deepSS(MODE, networkName):
     config = json.load(open("nets/"+networkName+"Config.json"))
     # load data object initially which provides training and test data loader
     with tf.device('/cpu:0'):
-        data = Data("../../datasets/"+config["dataset"]+"/configData"+config["dataset"]+".json")
+        data = Data("../data/"+config["dataset"]+"/configData"+config["dataset"]+".json")
     
     if MODE == "classWeights":
         data.getClassWeights("quantile")

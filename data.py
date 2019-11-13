@@ -58,7 +58,7 @@ class Data:
             randomIndices = np.arange(len(trainDataFiles), dtype=np.int32)
             random.shuffle(randomIndices)
             trainDataFiles = np.take(trainDataFiles, randomIndices)
-            trainLabelDataFiles = np.take(trainDataLabelFiles, randomIndices)
+            trainLabelDataFiles = np.take(trainLabelDataFiles, randomIndices)
             
             # set the given dataset split whith their element by simple numpy indexing
             self.imageData = {
@@ -265,20 +265,28 @@ class Data:
         labelImg = cv2.imread(self.pathImages["trainLabel"]+labelFilename.decode())
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         labelImg = cv2.cvtColor(labelImg, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
+        img = cv2.resize(img, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_AREA)
         if self.config["downsize"]: 
-            labelImg = cv2.resize(labelImg, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_NEAREST)
+            labelImg = cv2.resize(labelImg, (self.config["x"], self.config["y"]), interpolation=cv2.INTER_AREA)
+        
         # assure that there are no conversion errors in binary datasets
+              
         if self.config["classes"] <= 2:
-            labelImg[(labelImg  >= 128).all(-1)] = [255,255,255]
-            labelImg[(labelImg  <= 127).all(-1)] = [0,0,0]
+            labelImg[(labelImg  >= 1).all(-1)] = [255,255,255]
+            #labelImg[(labelImg  <= 127).all(-1)] = [0,0,0]
+        
+        #display(Image.fromarray(img, "RGB"))
+        #display(Image.fromarray(labelImg, "RGB"))
         # transform the RGB values of the mask to the class numbers according to the list set in the dataset config file
+        
         for rgbIdx, rgbV in enumerate(self.config["ClassToRGB"]):
-                labelImg[(labelImg == rgbV).all(-1)] = rgbIdx
-
+            labelImg[(labelImg == rgbV).all(-1)] = rgbIdx
+        
+        
         # assure that there are no RGB values left by assigning them the black class as in the zero
-        labelImg[(labelImg >= self.config["classes"])] = 0
-
+        #labelImg[(labelImg >= self.config["classes"])] = 0
+        
+        
         # standardasize the train image for better training
         img = ((img - img.mean()) / img.std()).astype(np.float32)
 

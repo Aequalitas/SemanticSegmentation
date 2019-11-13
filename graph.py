@@ -19,7 +19,7 @@ def buildGraph(sess, data, config):
 
         # class Weights for class imbalance
         # create weights for the particular batch
-        classWeights = [1.0, 1.0]
+        classWeights = [0.1, 1.0]
         #try:
         #    classWeights = np.load("classWeights"+str(data.config["x"])+str(data.config["y"])+data.config["name"]+".npy")
         #    print("Classweights successfully loaded!")
@@ -76,23 +76,23 @@ def buildGraph(sess, data, config):
                                               [tf.float32, tf.int32]
                                            ),  num_parallel_calls=config["threadCount"])
 
-                if (_type == "train") | (_type == "validation"):
+                #if (_type == "train") | (_type == "validation"):
                     # data augmentation
-                    datasetFlippedV = dataset.map(lambda trainImage, labelImage:
-                                                 (tf.reverse(trainImage, axis=[1]), tf.reverse(labelImage, axis=[1]))
-                                               , num_parallel_calls=config["threadCount"])
-                    dataset = dataset.concatenate(datasetFlippedV)
+                    #datasetFlippedV = dataset.map(lambda trainImage, labelImage:
+                    #                             (tf.reverse(trainImage, axis=[1]), tf.reverse(labelImage, axis=[1]))
+                    #                           , num_parallel_calls=config["threadCount"])
+                    #dataset = dataset.concatenate(datasetFlippedV)
 
                     #datasetFlippedH = dataset.map(lambda trainImage, labelImage:
                     #                              tf.reverse(trainImage, axis=2), tf.reverse(labelImage, axis=2)
                     #                           , num_parallel_calls=config["threadCount"])
 
-                    dataset = dataset.concatenate(datasetFlippedV)
-                    data.config[_type+"Size"] *= 2
-                    print("Dataset flipped vertically new ", _type, "Size: ", data.config[_type+"Size"])
+                    #dataset = dataset.concatenate(datasetFlippedV)
+                    #data.config[_type+"Size"] *= 2
+                    #print("Dataset flipped vertically new ", _type, "Size: ", data.config[_type+"Size"])
 
                 if _type == "train":
-                    dataset = dataset.shuffle(buffer_size=int(100/config["batchSize"]))
+                    dataset = dataset.shuffle(buffer_size=int(1000/config["batchSize"]))
                 
                 dataset = dataset.batch(config["batchSize"])
                 dataset = dataset.prefetch(4)

@@ -11,7 +11,7 @@ def predict(sess, config, data, graph):
 
     img = cv2.imread(imagePath)  
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    imgRes = cv2.resize(img, (data.config["x"], data.config["y"]), interpolation=cv2.INTER_NEAREST)
+    imgRes = cv2.resize(img, (data.config["x"], data.config["y"]), interpolation=cv2.INTER_AREA)
     
     imgRes = (imgRes - imgRes.mean()) / imgRes.std()
     
@@ -34,12 +34,13 @@ def predict(sess, config, data, graph):
     #for idx, p in enumerate(predClasses):
     #    predImg[idx] = data.config["ClassToRGB"][p]
 
+    #print(np.unique(predClasses))
     for cl in range(config["classes"]):
         predImg[(predClasses == cl)] = data.config["ClassToRGB"][cl]
-   
+    #print(np.unique(predImg))
+          
     predImg = predImg.reshape((data.config["y"], data.config["x"], data.config["imageChannels"])).astype("uint8")
-    #print(predClasses)
     savePath = "../results/"+data.config["name"]+str(data.config["x"])+str(data.config["y"])+config["neuralNetwork"]+".png"
     savedImage = Image.fromarray(predImg, "RGB")
     savedImage.save(savePath)
-    #display(savedImage)
+    display(savedImage)

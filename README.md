@@ -18,11 +18,12 @@ I recreated different network architectures from papers descriptions:
 * [segNet.py](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=7803544)
 * [uNet.py](https://arxiv.org/pdf/1505.04597.pdf)
 
-
 Usage:
 
 ```
-python3 main.py <MODE> <NeuralNetwork>
+from main import deepSS
+deepSS("<MODE>", "<NeuralNetworkName")
+
 ```
 
 Whereas MODE can be either train, predict or eval. The names of the neural networks are the filename without the .py extension. Information about the modes:
@@ -34,38 +35,43 @@ Whereas MODE can be either train, predict or eval. The names of the neural netwo
 Example call:
 
 ```
-python3 main.py train refineNet
+
+from main import deepSS
+deepSS("train", "netFCN")
+
 ```
 
 The model is saved into a folder named models which is two directories above relative to the main file. The same for the tensorflow log files which are located in ../../logs and the dataset folder in ../../data.
 
 Main JSON config file:
 
-* batchSize: Batchsize for every train round
-* steps: How many steps each epoch should at least be done. Is only effective when smaller then dataset,
-* dataset: A name for the dataset,
-* classes: How many classes are to be differentiated with the model,
-* neuralNetwork: Name of the neural network,
+* batchSize: Int, Batchsize for every train round
+* steps: Int, How many steps each epoch should at least be done. Is only effective when smaller then dataset,
+* dataset: String, A name for the dataset,
+* classes: Int, How many classes are to be differentiated with the model,
+* neuralNetwork: String, Name of the neural network,
 * learningRate: Float for the learning rate,
-* epochs: How many epochs the model should be trained with,
-* gpu: GPU number
+* threadCount: Int, how many threads are utilized for the dataset pipline
+* epochs: Int, How many epochs the model should be trained with,
+* gpu: String, GPU number
 
 Dataset JSON config file:
 
 * name: Name of the dataset,
 * size: Int, size of the dataset,
-* trainSize: float, percentage for how big the train size should be e.g. 95% of the dataset -> 0.95,
-* testSize: float, percentage for the test size
-* x: int, x value of the to be used image,
-* y: int, y value of the to be used image,
-* imageChannels: int, how many channels does the input image have,
+* trainSize: Float, percentage for how big the train size should be e.g. 95% of the dataset -> 0.95,
+* testSize: Float, percentage for the test size
+* batchSize: Int, Batchsize for every train round
+* x: Int, x value of the to be used image,
+* y: Int, y value of the to be used image,
+* imageChannels: Int, how many channels does the input image have,
 * preProcessedPath": Path of already pre-processed images,
 * downsize: String, "True" when the images should be downsized, "False" when not,
-* classes : How many classes are to be differentiated with the model,
-* path: Relative path to the dataset foler,
-* serializedObject: Wether the dataset is serialized into a numpy object,
-* fileName: Filename of the serialized object,
-* images: Subfolder of the train input images,
-* labels: Subfolder of the label input images(Ground-truth),
+* classes : Int, How many classes are to be differentiated with the model,
+* path: String, Relative path to the dataset foler,
+* serializedObject: boolean, Wether the dataset is serialized into a numpy object,
+* fileName: String, Filename of the serialized object,
+* images: String, Subfolder of the train input images,
+* labels: String, Subfolder of the label input images(Ground-truth),
 * ClassToRGB: Int Array, where the index is the class and the value and RGB array that is associated with this class
  
